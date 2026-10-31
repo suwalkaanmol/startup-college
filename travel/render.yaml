@@ -1,0 +1,19 @@
+# Render Blueprint: New > Blueprint > pick this repo
+services:
+  - type: web
+    name: go2gether-api
+    runtime: node
+    rootDir: travel/server   # this module lives in /travel of the campus super-app repo
+    plan: free            # change to "starter" to avoid cold starts / sleeping
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false       # you paste this in the dashboard
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLIENT_URL
+        sync: false       # your Vercel URL, e.g. https://YOUR-SITE.vercel.app
