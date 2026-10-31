@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Startup College • Campus All-in-One Super App</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    .module-card {
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .module-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 28px -6px rgba(124, 58, 237, 0.35);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-8 font-sans antialiased flex flex-col items-center">
+
+  <!-- Header Banner -->
+  <header class="max-w-4xl w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-6 mb-6 shadow-2xl backdrop-blur flex flex-col md:flex-row items-center justify-between gap-4">
+    <div class="flex items-center space-x-4">
+      <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-500 to-amber-500 flex items-center justify-center text-3xl shadow-lg shadow-purple-950/50">
+        🎓
+      </div>
+      <div>
+        <h1 class="text-2xl font-black text-white tracking-tight flex items-center gap-2">
+          Startup College
+          <span class="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-mono font-bold uppercase tracking-wider">
+            Super App Hub
+          </span>
+        </h1>
+        <p class="text-xs text-slate-400 mt-0.5">
+          Unified campus services merging Food, Travel, Campus Navigation, Xerox, and PG
+        </p>
+      </div>
+    </div>
+
+    <div class="flex items-center space-x-2 font-mono text-xs">
+      <span class="px-3 py-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-xl font-bold flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        5 Core Modules Integrated
+      </span>
+    </div>
+  </header>
+
+  <!-- 5-Service Grid Hub (Merging All Modules) -->
+  <main class="max-w-4xl w-full">
+    <div class="flex items-center justify-between mb-3 px-1">
+      <span class="text-xs font-mono uppercase tracking-wider text-purple-400 font-bold">
+        Integrated Campus Modules:
+      </span>
+      <span class="text-[11px] text-slate-500 font-mono">Select any module to launch</span>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      
+      <!-- 1. FOOD -->
+      <div onclick="launchModule('food')" class="module-card bg-slate-900 border border-slate-800 hover:border-amber-500/60 rounded-3xl p-5 cursor-pointer flex flex-col justify-between h-48 group">
+        <div class="flex items-start justify-between">
+          <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-2xl group-hover:scale-110 transition">
+            🍔
+          </div>
+          <span class="text-[10px] font-mono px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 font-bold">
+            /food
+          </span>
+        </div>
+        <div>
+          <h3 class="text-base font-black text-white group-hover:text-amber-300 transition">Food & Canteen</h3>
+          <p class="text-xs text-slate-400 mt-1 line-clamp-2">
+            Campus dining menus, cafeteria ordering, and late-night snacks delivery.
+          </p>
+        </div>
+        <div class="text-[11px] font-mono text-amber-400 font-bold flex items-center gap-1">
+          Open Module <span>➔</span>
+        </div>
+      </div>
+
+      <!-- 2. TRAVEL -->
+      <div onclick="launchModule('travel')" class="module-card bg-slate-900 border border-slate-800 hover:border-indigo-500/60 rounded-3xl p-5 cursor-pointer flex flex-col justify-between h-48 group">
+        <div class="flex items-start justify-between">
+          <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-2xl group-hover:scale-110 transition">
+            🚖
+          </div>
+          <span class="text-[10px] font-mono px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 font-bold">
+            /travel
+          </span>
+        </div>
+        <div>
+          <h3 class="text-base font-black text-white group-hover:text-indigo-300 transition">Travel & Commute</h3>
+          <p class="text-xs text-slate-400 mt-1 line-clamp-2">
+            Campus shuttles schedule, auto-sharing, railway/airport cab pools.
+          </p>
+        </div>
+        <div class="text-[11px] font-mono text-indigo-400 font-bold flex items-center gap-1">
+          Open Module <span>➔</span>
+        </div>
+      </div>
+
+      <!-- 3. NAV -->
+      <div onclick="launchModule('nav')" class="module-card bg-gradient-to-br from-purple-950/40 via-slate-900 to-slate-900 border-2 border-purple-500/60 hover:border-purple-400 rounded-3xl p-5 cursor-pointer flex flex-col justify-between h-48 group shadow-lg shadow-purple-950/40">
+        <div class="flex items-start justify-between">
+          <div class="w-12 h-12 rounded-2xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-2xl group-hover:scale-110 transition">
+            🧭
+          </div>
+          <span class="text-[10px] font-mono px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 font-bold">
+            /nav ★ Active
+          </span>
+        </div>
+        <div>
+          <h3 class="text-base font-black text-white group-hover:text-purple-300 transition">Campus Navigation</h3>
+          <p class="text-xs text-slate-300 mt-1 line-clamp-2">
+            POV Walking Video & Real-Photo turn-by-turn guidance for PRP 6th Floor (600–678).
+          </p>
+        </div>
+        <div class="text-[11px] font-mono text-purple-300 font-bold flex items-center gap-1">
+          Open Module <span>➔</span>
+        </div>
+      </div>
+
+      <!-- 4. XEROX -->
+      <div onclick="launchModule('xerox')" class="module-card bg-slate-900 border border-slate-800 hover:border-cyan-500/60 rounded-3xl p-5 cursor-pointer flex flex-col justify-between h-48 group">
+        <div class="flex items-start justify-between">
+          <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-2xl group-hover:scale-110 transition">
+            🖨️
+          </div>
+          <span class="text-[10px] font-mono px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 font-bold">
+            /xerox
+          </span>
+        </div>
+        <div>
+          <h3 class="text-base font-black text-white group-hover:text-cyan-300 transition">Xerox & Print Hub</h3>
+          <p class="text-xs text-slate-400 mt-1 line-clamp-2">
+            Fast document uploading, lab manual printouts, and hostel doorstep xerox delivery.
+          </p>
+        </div>
+        <div class="text-[11px] font-mono text-cyan-400 font-bold flex items-center gap-1">
+          Open Module <span>➔</span>
+        </div>
+      </div>
+
+      <!-- 5. PG -->
+      <div onclick="launchModule('pg')" class="module-card bg-slate-900 border border-slate-800 hover:border-emerald-500/60 rounded-3xl p-5 cursor-pointer flex flex-col justify-between h-48 group">
+        <div class="flex items-start justify-between">
+          <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-2xl group-hover:scale-110 transition">
+            🏠
+          </div>
+          <span class="text-[10px] font-mono px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 font-bold">
+            /pg
+          </span>
+        </div>
+        <div>
+          <h3 class="text-base font-black text-white group-hover:text-emerald-300 transition">PG & Accommodations</h3>
+          <p class="text-xs text-slate-400 mt-1 line-clamp-2">
+            Verified student PGs, apartments, rent details, and flatmate matching around campus.
+          </p>
+        </div>
+        <div class="text-[11px] font-mono text-emerald-400 font-bold flex items-center gap-1">
+          Open Module <span>➔</span>
+        </div>
+      </div>
+
+      <!-- 6. SYSTEM STATUS / INTEGRATION -->
+      <div class="bg-slate-900/50 border border-dashed border-slate-800 rounded-3xl p-5 flex flex-col justify-between h-48">
+        <div class="flex items-start justify-between">
+          <div class="w-12 h-12 rounded-2xl bg-slate-800/50 border border-slate-700/50 flex items-center justify-center text-2xl">
+            🔗
+          </div>
+          <span class="text-[10px] font-mono px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 font-bold">
+            index.html
+          </span>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-slate-300">Merger & Orchestrator</h3>
+          <p class="text-xs text-slate-500 mt-1">
+            Root orchestrator file coordinating data and routing between all 5 modules.
+          </p>
+        </div>
+        <div class="text-[10px] font-mono text-slate-500">
+          Status: Operational ✓
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Script to Handle Module Routing -->
+  <script>
+    function launchModule(moduleName) {
+      console.log(`Launching module: ${moduleName}`);
+      // When each module subfolder has its own index.html or view, this navigates directly to it
+      window.location.href = `./${moduleName}/index.html`;
+    }
+  </script>
+
+</body>
+</html>
