@@ -1,5 +1,5 @@
 // Xerox: upload PDFs, choose print options, see the price, order, and follow the token live.
-import { $, $$, esc, money, when, api, toast, requireStudent, live, bar, pill, sheet, store } from '../hub/web/kit.js';
+import { $, $$, esc, money, when, api, toast, requireStudent, live, bar, pill, sheet, store, paySheet } from '../hub/web/kit.js';
 
 const user = await requireStudent();
 const app = $('#app');
@@ -11,7 +11,7 @@ const ACTIVE = ['QUEUED', 'PRINTING', 'READY'];
 app.innerHTML = `
   <section class="hero xerox">
     <h2>Print without the queue</h2>
-    <p>Upload your PDFs, pick the options, and collect from the shop with your token. Pay at the shop.</p>
+    <p>Upload your PDFs, pay from your phone, and pick up your prints with a token. The shop prints only paid orders, so no queue at the counter.</p>
     <div class="chips" id="shops" style="margin-top:14px" aria-label="Shop"></div>
   </section>
   <div id="active" class="stack" style="margin-top:14px"></div>
@@ -131,7 +131,7 @@ function renderSide() {
         <div class="divider"></div><div class="row between"><b>Total</b><b class="num" style="font-size:20px">${money(quote.total)}</b></div>` : '<p class="muted">Working out the price…</p>'}
       <div class="field" style="margin-top:12px"><label for="note">Note for the shop (optional)</label><input id="note" maxlength="200" placeholder="Staple each set, print the cover in colour…"></div>
       <p class="err" id="order-err" role="alert"></p>
-      <button class="btn primary block" id="place" ${ready.length && quote && !quote.error && shop.open ? '' : 'disabled'}>${shop.open ? 'Send to print · pay at shop' : `${esc(shop.name)} is closed`}</button></div>
+      <button class="btn primary block" id="place" ${ready.length && quote && !quote.error && shop.open ? '' : 'disabled'}>${shop.open ? (quote?.total ? `Pay ${money(quote.total)} & print` : 'Pay & print') : `${esc(shop.name)} is closed`}</button></div>
     <div class="card small"><h3 style="font-size:14px;margin-bottom:8px">Prices at ${esc(shop.name)}</h3>
       <div class="row between"><span>B&amp;W, one side</span><b>${money(r.bwSingle)} / sheet</b></div>
       <div class="row between"><span>B&amp;W, both sides</span><b>${money(r.bwDouble)} / sheet</b></div>
@@ -141,15 +141,23 @@ function renderSide() {
 }
 $('#side').addEventListener('click', async (e) => {
   if (e.target.id !== 'place') return;
-  const btn = e.target; btn.disabled = true; btn.textContent = 'Sending…'; $('#order-err').textContent = '';
-  try {
-    const { order } = await api('/api/xerox/orders', { method: 'POST', body: { shopId: shop.id, note: $('#note').value, files: files.filter((f) => !f.uploading).map(payload) } });
-    files = []; quote = null; renderFiles(); renderSide(); await loadOrders();
-    const done = sheet({ title: 'Sent to the shop', body: `<div style="text-align:center"><p class="muted">Your token at ${esc(order.shopName)}</p><p class="token" style="margin:8px 0">${esc(order.token)}</p>
-      <p>${pill(order.status)}</p><p class="muted small" style="margin-top:10px">We’ll show it here when your prints are ready. Pay ${money(order.total)} at the shop when you collect.</p></div>`,
-      foot: '<button class="btn primary block" id="ok-done">Done</button>' });
-    done.el.querySelector('#ok-done').addEventListener('click', done.close);
-  } catch (x) { $('#order-err').textContent = x.message; btn.disabled = false; btn.textContent = 'Send to print · pay at shop'; }
+  $('#order-err').textContent = '';
+  const body = { shopId: shop.id, note: $('#note').value, files: files.filter((f) => !f.uploading).map(payload) };
+  paySheet({
+    amount: quote.total, payee: shop.name, phone: user.phone,
+    onPay: async (pay) => {
+      try {
+        const { order } = await api('/api/xerox/orders', { method: 'POST', body: { ...body, pay } });
+        files = []; quote = null; renderFiles(); renderSide(); loadOrders();
+        return { ref: order.payment.ref, after: () => {
+          const done = sheet({ title: 'Sent to the shop', body: `<div style="text-align:center"><p class="muted">Your token at ${esc(order.shopName)}</p><p class="token" style="margin:8px 0">${esc(order.token)}</p>
+            <p>${pill(order.status)} <span class="paid">✓ Paid ${money(order.total)}</span></p><p class="muted small" style="margin-top:10px">The shop has your files. We’ll tell you here when your prints are ready, then just show this token.</p></div>`,
+            foot: '<button class="btn primary block" id="ok-done">Done</button>' });
+          done.el.querySelector('#ok-done').addEventListener('click', done.close);
+        } };
+      } catch (x) { if (!String(x.code).startsWith('PAY')) $('#order-err').textContent = x.message; throw x; }
+    },
+  });
 });
 
 /* ---------- orders ---------- */
@@ -158,8 +166,8 @@ const fileLine = (o) => o.files.map((f) => `${f.name} (${f.copies}×, ${f.color 
 function renderActive() {
   $('#active').innerHTML = orders.filter((o) => ACTIVE.includes(o.status)).map((o) => `<div class="card row" style="${o.status === 'READY' ? 'border-color:var(--uh-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--uh-accent) 18%,transparent)' : ''}">
       <div><p class="muted small">Token</p><p class="token" style="font-size:32px">${esc(o.token)}</p></div>
-      <div class="grow"><b>${esc(o.shopName)}</b> ${pill(o.status)}<p class="muted small" style="overflow-wrap:anywhere">${esc(fileLine(o))} · ${money(o.total)}</p>
-        ${o.status === 'READY' ? '<p class="small" style="margin-top:4px"><b>Ready at the shop.</b> Show this token and pay there.</p>' : ''}</div>
+      <div class="grow"><b>${esc(o.shopName)}</b> ${pill(o.status)} ${o.payment?.status === 'PAID' ? `<span class="paid">✓ Paid ${money(o.total)}</span>` : o.payment?.status === 'REFUNDED' ? '<span class="pill">Refunded</span>' : ''}<p class="muted small" style="overflow-wrap:anywhere">${esc(fileLine(o))} · ${money(o.total)}</p>
+        ${o.status === 'READY' ? '<p class="small" style="margin-top:4px"><b>Ready at the shop.</b> Show this token to collect. Already paid.</p>' : ''}</div>
       ${o.status === 'QUEUED' ? `<button class="btn danger sm" data-cancel="${o.id}">Cancel</button>` : ''}</div>`).join('');
 }
 function renderOrders() {

@@ -88,3 +88,50 @@ html[data-unihub-module="pg"] .wrap h1 { font-size: 34px; }
 .uh-corner.left { right: auto; left: max(12px, env(safe-area-inset-left, 0px)); }
 .uh-corner:hover { border-color: var(--uh-accent); }
 .uh-corner:focus-visible { outline: 3px solid var(--u-300); outline-offset: 2px; }
+
+/* ---------- Section looks: each section keeps the UniHub shape and type, with colours and a drawing that match what it is for ---------- */
+:root:root {
+  --art-food: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 200 160%27 fill=%27none%27 stroke=%27white%27 stroke-width=%273.2%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3E%3Cellipse cx=%27100%27 cy=%27118%27 rx=%2786%27 ry=%2724%27/%3E%3Cellipse cx=%27100%27 cy=%27114%27 rx=%2770%27 ry=%2715%27/%3E%3Cpath d=%27M50 112a16 7 0 0 1 32 0M86 106a16 7 0 0 1 32 0M122 112a16 7 0 0 1 32 0%27/%3E%3Cpath d=%27M66 82c-7-9 7-14 0-25M100 74c-7-9 7-14 0-25M134 82c-7-9 7-14 0-25%27/%3E%3Cpath d=%27M176 58l-14 46%27/%3E%3Cellipse cx=%27180%27 cy=%2748%27 rx=%277%27 ry=%2711%27 transform=%27rotate%2817 180 48%29%27/%3E%3C/svg%3E");
+  --art-xerox: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 200 160%27 fill=%27none%27 stroke=%27white%27 stroke-width=%273.2%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27M40 70h120a10 10 0 0 1 10 10v34a10 10 0 0 1-10 10H40a10 10 0 0 1-10-10V80a10 10 0 0 1 10-10z%27/%3E%3Cpath d=%27M58 70V22h84v48%27/%3E%3Cpath d=%27M66 36h44M66 48h68M66 60h52%27/%3E%3Cpath d=%27M58 106h84v46H58z%27/%3E%3Cpath d=%27M70 120h50M70 132h60%27/%3E%3Ccircle cx=%27152%27 cy=%2788%27 r=%274%27/%3E%3C/svg%3E");
+  --art-travel: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 200 160%27 fill=%27none%27 stroke=%27white%27 stroke-width=%273.2%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27M14 146c36-6 44-44 78-48s46 16 70-22%27 stroke-dasharray=%271 11%27 stroke-width=%274.5%27/%3E%3Ccircle cx=%2714%27 cy=%27146%27 r=%277%27/%3E%3Cpath d=%27M166 64s-18-18-18-32a18 18 0 0 1 36 0c0 14-18 32-18 32z%27/%3E%3Ccircle cx=%27166%27 cy=%2732%27 r=%276%27/%3E%3Cpath d=%27M70 136h40l-5-12H75z%27/%3E%3Ccircle cx=%2778%27 cy=%27138%27 r=%274%27/%3E%3Ccircle cx=%27102%27 cy=%27138%27 r=%274%27/%3E%3C/svg%3E");
+  --art-pg: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 200 160%27 fill=%27none%27 stroke=%27white%27 stroke-width=%273.2%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27M4 146h192%27/%3E%3Cpath d=%27M14 146V100l28-22 28 22v46%27/%3E%3Cpath d=%27M70 146V84l36-30 36 30v62%27/%3E%3Cpath d=%27M142 146v-40l24-18 24 18v40%27/%3E%3Cpath d=%27M96 146v-30h20v30%27/%3E%3Cpath d=%27M30 108h12v12H30zM152 112h12v12h-12zM88 80h12v12H88zM112 80h12v12h-12z%27/%3E%3Cpath d=%27M120 46V30h10v24%27/%3E%3C/svg%3E");
+  --art-admin: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 200 160%27 fill=%27none%27 stroke=%27white%27 stroke-width=%273.2%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27M100 18l56 22v36c0 34-24 56-56 66-32-10-56-32-56-66V40z%27/%3E%3Cpath d=%27M76 82l16 16 32-34%27/%3E%3C/svg%3E");
+
+  --g-food: linear-gradient(140deg, #8a2c0d 0%, #d4520f 55%, #f08c1a 100%);
+  --g-xerox: linear-gradient(140deg, #0a1b2e 0%, #134a5e 55%, #0e8aa8 100%);
+  --g-travel: linear-gradient(140deg, #0f3d3a 0%, #0f766e 55%, #19a493 100%);
+  --g-pg: linear-gradient(155deg, #133d22 0%, #1d6b34 60%, #4f8f1f 100%);
+}
+/* Food: warm saffron, like a canteen counter */
+:root:root[data-unihub-module^="food"] {
+  --uh-bg: #fff8f1; --uh-surface-2: #fff0e1; --uh-line: #f6d9bd; --uh-accent: #b9450c; --uh-text: #2a1406; --uh-muted: #7a5440;
+  --u-400: #f08c1a; --u-800: #8a2c0d; --u-900: #4a1806; --g-brand: linear-gradient(135deg, #b23d0c 0%, #e2690f 100%); --sec-glow: rgba(240, 140, 26, .16);
+}
+:root:root[data-theme="dark"][data-unihub-module^="food"] {
+  --uh-bg: #160c06; --uh-surface: #22140b; --uh-surface-2: #2e1b0e; --uh-line: #4a2d17; --uh-accent: #ffa25c; --uh-text: #fbeee4; --uh-muted: #c9a68f; --sec-glow: rgba(240, 140, 26, .12);
+}
+/* Xerox: ink on paper */
+:root:root[data-unihub-module^="xerox"] {
+  --uh-bg: #f5f7f8; --uh-surface-2: #e9f1f4; --uh-line: #d4e1e6; --uh-accent: #0b6f8a; --uh-text: #0b1b26; --uh-muted: #4c6470;
+  --u-400: #22b3d4; --u-800: #134a5e; --u-900: #0a1b2e; --g-brand: linear-gradient(135deg, #0f3e52 0%, #0e7f9c 100%); --sec-glow: rgba(14, 138, 168, .13);
+}
+:root:root[data-theme="dark"][data-unihub-module^="xerox"] {
+  --uh-bg: #061218; --uh-surface: #0b1d25; --uh-surface-2: #102a35; --uh-line: #1b4150; --uh-accent: #5fd4ee; --uh-text: #e6f4f8; --uh-muted: #93b4c0; --sec-glow: rgba(14, 138, 168, .14);
+}
+/* Travel: teal, like a route on a map */
+:root:root[data-unihub-module^="travel"] {
+  --uh-bg: #f2faf8; --uh-surface-2: #e1f3ef; --uh-line: #c6e6de; --uh-accent: #0d6b63; --uh-text: #062320; --uh-muted: #47665f;
+  --u-400: #2cc2ae; --u-800: #0f3d3a; --u-900: #082624; --g-brand: linear-gradient(135deg, #0e5952 0%, #13917f 100%); --sec-glow: rgba(25, 164, 147, .14);
+}
+:root:root[data-theme="dark"][data-unihub-module^="travel"] {
+  --uh-bg: #051513; --uh-surface: #0a221f; --uh-surface-2: #0f302b; --uh-line: #1a4a42; --uh-accent: #4fe0c8; --uh-text: #e3f7f3; --uh-muted: #8fb9b0; --sec-glow: rgba(25, 164, 147, .12);
+}
+/* PG: leafy green, like home */
+:root:root[data-unihub-module^="pg"] {
+  --uh-bg: #f5faf2; --uh-surface-2: #e7f3e1; --uh-line: #cfe5c6; --uh-accent: #1d6b34; --uh-text: #0d2213; --uh-muted: #4e6852;
+  --u-400: #6fbf3f; --u-800: #133d22; --u-900: #0b2414; --g-brand: linear-gradient(135deg, #18582b 0%, #2f8a3c 100%); --sec-glow: rgba(79, 143, 31, .14);
+}
+:root:root[data-theme="dark"][data-unihub-module^="pg"] {
+  --uh-bg: #071309; --uh-surface: #0d2111; --uh-surface-2: #132d18; --uh-line: #214a29; --uh-accent: #86e08f; --uh-text: #e8f6e8; --uh-muted: #9ebd9f; --sec-glow: rgba(111, 191, 63, .12);
+}
+:root:root[data-unihub-module] body { background: radial-gradient(1100px 420px at 50% -180px, var(--sec-glow, transparent), transparent 70%) no-repeat, var(--uh-bg); }

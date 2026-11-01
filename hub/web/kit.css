@@ -156,3 +156,24 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--u
 .hero .seg { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.3); }
 .hero .seg button { color: rgba(255,255,255,.88); }
 .hero .seg button[aria-pressed="true"] { color: var(--u-800); background: #fff; }
+
+/* Pay by phone */
+.pay { display: grid; gap: 14px; }
+.pay-amt { display: grid; justify-items: center; gap: 2px; padding: 16px; border-radius: 16px; background: var(--uh-surface-2); }
+.pay-amt b { font: 700 34px/1.1 var(--f-display); color: var(--uh-text); }
+.pay-ph { display: flex; align-items: stretch; border: 1.5px solid var(--uh-line); border-radius: 11px; overflow: hidden; background: var(--uh-surface); }
+.pay-ph span { display: grid; place-items: center; padding: 0 12px; background: var(--uh-surface-2); color: var(--uh-muted); font-weight: 600; }
+.pay-ph input { border: 0; border-radius: 0; }
+.pay-otp { text-align: center; font: 600 24px/1 var(--f-display) !important; letter-spacing: .4em; }
+.link { border: 0; background: none; color: var(--uh-accent); font: inherit; font-weight: 600; cursor: pointer; padding: 0; text-decoration: underline; }
+.pay-done { display: grid; justify-items: center; gap: 6px; padding: 18px 0 6px; text-align: center; }
+.pay-tick { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--uh-ok); color: #fff; font: 700 32px/1 var(--f-display); animation: pay-pop .35s ease-out; }
+@keyframes pay-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .pay-tick { animation: none; } }
+.paid { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--uh-ok); }
+
+/* Section drawings behind the hero */
+.hero.food { --art: var(--art-food); } .hero.xerox { --art: var(--art-xerox); } .hero.travel { --art: var(--art-travel); } .hero.pg { --art: var(--art-pg); } .hero.admin { --art: var(--art-admin); }
+.hero::before { content: ""; position: absolute; z-index: -1; right: 14px; bottom: -6px; width: min(42%, 300px); aspect-ratio: 5 / 4; background: var(--art) no-repeat right bottom / contain; opacity: .26; pointer-events: none; }
+@media (max-width: 640px) { .hero::before { width: 46%; opacity: .16; right: 6px; } }
+.bar-title .ico { box-shadow: 0 4px 12px var(--sec-glow, rgba(14,29,85,.2)); }

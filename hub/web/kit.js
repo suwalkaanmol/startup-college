@@ -152,3 +152,49 @@ export function staffMenu(actions, staff) {
   });
   actions.appendChild(b);
 }
+
+// Pay by phone (UPI) before an order is sent. Step 1: mobile number. Step 2: the 6-digit code. Then onPay({ phone, otp })
+// places the order; if it throws, the message shows here and the student can fix the code.
+export function paySheet({ amount, payee, phone = '', onPay }) {
+  const ph = String(phone).replace(/^\+91/, '');
+  const s = sheet({
+    title: 'Pay online',
+    body: `<div class="pay">
+      <div class="pay-amt"><span class="muted small">Paying ${esc(payee)}</span><b class="num">${money(amount)}</b></div>
+      <form id="pay-1" class="stack" novalidate>
+        <div class="field"><label for="pay-ph">Mobile number linked to your UPI</label>
+          <div class="pay-ph"><span>+91</span><input id="pay-ph" inputmode="numeric" autocomplete="tel-national" maxlength="10" value="${esc(ph)}" placeholder="98765 43210"></div></div>
+        <button class="btn primary block" type="submit">Send code</button>
+      </form>
+      <form id="pay-2" class="stack" novalidate hidden>
+        <p class="small">We sent a 6-digit code to <b id="pay-to"></b>. <button type="button" class="link" id="pay-edit">Change</button></p>
+        <div class="field"><label for="pay-otp">Code</label><input id="pay-otp" class="pay-otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••"></div>
+        <p class="notice small">Demo payment: no money is taken. Use the code <b>123456</b>.</p>
+        <button class="btn primary block" type="submit" id="pay-go">Pay ${money(amount)}</button>
+      </form>
+      <div id="pay-done" class="pay-done" hidden aria-live="polite"><div class="pay-tick" aria-hidden="true">✓</div><b>Payment done</b><span class="muted small" id="pay-ref"></span></div>
+      <p class="err" id="pay-err" role="alert"></p></div>`,
+  });
+  const q = (sel) => s.el.querySelector(sel);
+  const err = (m = '') => { q('#pay-err').textContent = m; };
+  q('#pay-ph').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10); });
+  q('#pay-otp').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6); err(); });
+  q('#pay-1').addEventListener('submit', (e) => {
+    e.preventDefault(); const v = q('#pay-ph').value;
+    if (!/^[6-9]\d{9}$/.test(v)) { err('Enter a 10-digit Indian mobile number.'); return; }
+    err(); q('#pay-to').textContent = `+91 ${v.slice(0, 5)} ${v.slice(5)}`;
+    q('#pay-1').hidden = true; q('#pay-2').hidden = false; q('#pay-otp').focus();
+  });
+  q('#pay-edit').addEventListener('click', () => { q('#pay-2').hidden = true; q('#pay-1').hidden = false; q('#pay-ph').focus(); err(); });
+  q('#pay-2').addEventListener('submit', async (e) => {
+    e.preventDefault(); const otp = q('#pay-otp').value;
+    if (otp.length !== 6) { err('Enter the 6-digit code.'); return; }
+    const btn = q('#pay-go'); btn.disabled = true; btn.textContent = 'Paying…'; err();
+    try {
+      const res = await onPay({ phone: q('#pay-ph').value, otp });
+      q('#pay-2').hidden = true; q('#pay-done').hidden = false; q('#pay-ref').textContent = res?.ref ? `Ref ${res.ref}` : '';
+      setTimeout(() => { s.close(); res?.after?.(); }, 1100);
+    } catch (x) { err(x.message); btn.disabled = false; btn.textContent = `Pay ${money(amount)}`; if (x.code === 'PAY_CODE') q('#pay-otp').select(); else if (!String(x.code || '').startsWith('PAY')) setTimeout(s.close, 1800); }
+  });
+  return s;
+}

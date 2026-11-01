@@ -57,7 +57,7 @@ async function start(staff) {
       <div class="row between"><span class="tok">${esc(o.token)}</span><span class="muted small">${esc(when(o.createdAt, { day: undefined, month: undefined }))}</span></div>
       <ul style="margin:8px 0;padding-left:18px">${o.items.map((i) => `<li>${i.qty} × ${esc(i.name)}</li>`).join('')}</ul>
       ${o.note ? `<p class="notice small" style="margin-bottom:8px">“${esc(o.note)}”</p>` : ''}
-      <p class="small muted">${esc(o.studentName)} · ${esc(o.phone)} · <b class="num" style="color:var(--uh-text)">${money(o.total)}</b></p>
+      <p class="small muted">${esc(o.studentName)} · ${esc(o.phone)} · <b class="num" style="color:var(--uh-text)">${money(o.total)}</b> ${o.payment?.status === 'PAID' ? '<span class="paid">✓ Paid online</span>' : ''}</p>
       <div class="row" style="margin-top:10px">${btns}</div></article>`;
   function renderBoard() {
     const by = (s) => data.orders.filter((o) => o.status === s);

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { HttpError, readJson, readBody, need, today } from '../lib/http.js';
+import { takePayment, refund } from '../lib/pay.js';
 
 const FLOW = { QUEUED: ['PRINTING', 'CANCELLED'], PRINTING: ['READY', 'CANCELLED'], READY: ['COLLECTED'], COLLECTED: [], CANCELLED: [] };
 const ACTIVE = ['QUEUED', 'PRINTING', 'READY'];
@@ -96,11 +97,12 @@ export default function xerox(r, { store, live }) {
     const files = readFiles(b.files, user, s);
     const active = store.list('xeroxOrders', (o) => o.studentId === user.id && ACTIVE.includes(o.status));
     if (active.length >= 3) throw new HttpError(429, 'TOO_MANY', 'You already have 3 print orders in progress. Collect one first.');
+    const payment = takePayment(b.pay, files.reduce((n, f) => n + f.cost, 0));
     const day = today();
     const o = store.put('xeroxOrders', {
       shopId: s.id, shopName: s.name, studentId: user.id, studentName: user.name, phone: user.phone, regNo: user.regNo,
       files, total: files.reduce((n, f) => n + f.cost, 0), token: `${s.prefix}${store.next(`xerox:${s.id}:${day}`)}`, day,
-      status: 'QUEUED', payment: 'AT_SHOP', note: String(b.note || '').trim().slice(0, 200),
+      status: 'QUEUED', payment, note: String(b.note || '').trim().slice(0, 200),
     });
     pubOrder(o);
     return { order: o };
@@ -114,7 +116,7 @@ export default function xerox(r, { store, live }) {
     const o = store.get('xeroxOrders', params.id);
     if (!o || o.studentId !== user.id) throw new HttpError(404, 'NOT_FOUND', 'Order not found.');
     if (o.status !== 'QUEUED') throw new HttpError(409, 'TOO_LATE', 'The shop has started printing, so it can’t be cancelled here.');
-    pubOrder(store.patch('xeroxOrders', o.id, { status: 'CANCELLED', cancelledBy: 'student' }));
+    pubOrder(store.patch('xeroxOrders', o.id, { status: 'CANCELLED', cancelledBy: 'student', payment: refund(o.payment) }));
     return { ok: true };
   });
 
@@ -133,7 +135,7 @@ export default function xerox(r, { store, live }) {
     const o = store.get('xeroxOrders', params.id); if (!o) throw new HttpError(404, 'NOT_FOUND', 'Order not found.');
     forStaff(staff, o.shopId);
     if (!FLOW[o.status]?.includes(status)) throw new HttpError(409, 'BAD_STEP', `An order that is ${o.status.toLowerCase()} can’t move to ${String(status).toLowerCase()}.`);
-    const u = store.patch('xeroxOrders', o.id, { status, ...(status === 'CANCELLED' ? { cancelledBy: 'shop' } : {}) }); pubOrder(u);
+    const u = store.patch('xeroxOrders', o.id, { status, ...(status === 'CANCELLED' ? { cancelledBy: 'shop', payment: refund(o.payment) } : {}) }); pubOrder(u);
     return { order: u };
   });
 

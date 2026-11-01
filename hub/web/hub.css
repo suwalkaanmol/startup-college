@@ -176,3 +176,10 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .tile-badge-unused { position: absolute; top: 20px; right: 20px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.3); color: #fff; }
 
 .link { text-decoration: none; }
+
+/* Each tile carries its section's drawing */
+.tile.food { --art: var(--art-food); } .tile.xerox { --art: var(--art-xerox); } .tile.travel { --art: var(--art-travel); } .tile.pg { --art: var(--art-pg); }
+.tile:not(.nav)::before { content: ""; position: absolute; z-index: -1; right: 10px; bottom: 6px; width: 40%; max-width: 190px; aspect-ratio: 5 / 4; background: var(--art) no-repeat right bottom / contain; opacity: .13; pointer-events: none; transition: transform .25s ease, opacity .25s ease; }
+.tile:hover::before { transform: translateY(-4px); opacity: .2; }
+.o-ico.food, .o-ico.xerox { box-shadow: none; }
+@media (prefers-reduced-motion: reduce) { .tile::before { transition: none; } }

@@ -1,5 +1,6 @@
 // Food: canteen menus, student orders with daily tokens, and the canteen staff board.
 import { HttpError, readJson, need, today } from '../lib/http.js';
+import { takePayment, refund } from '../lib/pay.js';
 
 const FLOW = { PLACED: ['PREPARING', 'CANCELLED'], PREPARING: ['READY', 'CANCELLED'], READY: ['COMPLETED'], COMPLETED: [], CANCELLED: [] };
 const ACTIVE = ['PLACED', 'PREPARING', 'READY'];
@@ -40,12 +41,13 @@ export default function food(r, { store, live }) {
     }
     const open = store.list('foodOrders', (o) => o.studentId === user.id && ACTIVE.includes(o.status));
     if (open.length >= 3) throw new HttpError(429, 'TOO_MANY', 'You already have 3 orders in progress. Collect one first.');
+    const payment = takePayment(body.pay, total);
     const day = today();
     const token = `${c.prefix || 'F'}${store.next(`food:${c.id}:${day}`)}`;
     const note = String(body.note || '').trim().slice(0, 140);
     const o = store.put('foodOrders', {
       canteenId: c.id, canteenName: c.name, studentId: user.id, studentName: user.name, phone: user.phone, regNo: user.regNo,
-      items: lines, total, token, day, status: 'PLACED', note, payment: 'AT_COUNTER',
+      items: lines, total, token, day, status: 'PLACED', note, payment,
     });
     pubOrder(o);
     return { order: o };
@@ -59,7 +61,7 @@ export default function food(r, { store, live }) {
     const o = store.get('foodOrders', params.id);
     if (!o || o.studentId !== user.id) throw new HttpError(404, 'NOT_FOUND', 'Order not found.');
     if (o.status !== 'PLACED') throw new HttpError(409, 'TOO_LATE', 'The kitchen has started this order, so it can’t be cancelled here. Ask at the counter.');
-    pubOrder(store.patch('foodOrders', o.id, { status: 'CANCELLED', cancelledBy: 'student' }));
+    pubOrder(store.patch('foodOrders', o.id, { status: 'CANCELLED', cancelledBy: 'student', payment: refund(o.payment) }));
     return { ok: true };
   });
 
@@ -82,7 +84,7 @@ export default function food(r, { store, live }) {
     const o = store.get('foodOrders', params.id); if (!o) throw new HttpError(404, 'NOT_FOUND', 'Order not found.');
     forStaff(staff, o.canteenId);
     if (!FLOW[o.status]?.includes(status)) throw new HttpError(409, 'BAD_STEP', `An order that is ${o.status.toLowerCase()} can’t move to ${String(status).toLowerCase()}.`);
-    const u = store.patch('foodOrders', o.id, { status, ...(status === 'CANCELLED' ? { cancelledBy: 'canteen' } : {}) });
+    const u = store.patch('foodOrders', o.id, { status, ...(status === 'CANCELLED' ? { cancelledBy: 'canteen', payment: refund(o.payment) } : {}) });
     pubOrder(u);
     return { order: u };
   });

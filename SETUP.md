@@ -32,6 +32,13 @@ The admin can add more logins, reset passwords, add canteens and manage PG listi
 3. On first start, the canteen and shop passwords are random and saved once to
    `/var/data/first-run-logins.txt`. Sign in as admin and reset any of them from the admin panel.
 
+## Payments
+
+Food and Xerox orders are paid online before they reach the kitchen or print shop, so there is no queue
+to pay and nothing is made for no-shows. Payment is in **demo mode**: no money moves, any mobile number
+works and the code is `123456`. To take real money, replace `takePayment()` in `hub/lib/pay.js` with a
+UPI gateway (Razorpay, Cashfree or PhonePe) and verify its signature there. Cancelled orders are marked refunded.
+
 Sample menus and PG listings are marked "Sample" in the app. Replace them from the staff and admin screens.
 
 ## Where things are

@@ -1,5 +1,5 @@
 // Food: browse a canteen's menu, build a cart, order ahead and follow the token live.
-import { $, $$, esc, money, when, api, toast, requireStudent, live, bar, pill, sheet, store } from '../hub/web/kit.js';
+import { $, $$, esc, money, when, api, toast, requireStudent, live, bar, pill, sheet, store, paySheet } from '../hub/web/kit.js';
 
 const user = await requireStudent();
 const app = $('#app');
@@ -16,7 +16,7 @@ const ACTIVE = ['PLACED', 'PREPARING', 'READY'];
 app.innerHTML = `
   <section class="hero food">
     <h2>Order ahead, skip the queue</h2>
-    <p>Pick a canteen, order, and collect when your token turns ready. Pay at the counter.</p>
+    <p>Order and pay from your phone. The kitchen starts only on paid orders, so there’s no queue to pay and no food made for nobody.</p>
     <div class="chips" id="canteens" role="tablist" aria-label="Canteen" style="margin-top:14px"></div>
   </section>
   <div id="active" class="stack" style="margin-top:14px"></div>
@@ -119,7 +119,7 @@ function cartHtml() {
     <div class="field"><label for="note">Note for the kitchen (optional)</label><input id="note" maxlength="140" placeholder="Less spicy, no onion…"></div>
     <div class="row between"><b>Total</b><b class="num" style="font-size:20px">${money(cartTotal())}</b></div>
     <p class="err" id="order-err" role="alert"></p>
-    <button class="btn primary block" id="place" ${canteen.open ? '' : 'disabled'}>${canteen.open ? 'Place order · pay at counter' : `${esc(canteen.name)} is closed`}</button>`;
+    <button class="btn primary block" id="place" ${canteen.open ? '' : 'disabled'}>${canteen.open ? `Pay ${money(cartTotal())} & order` : `${esc(canteen.name)} is closed`}</button>`;
 }
 function renderCart() {
   const n = cartLines().reduce((a, l) => a + l.qty, 0);
@@ -141,16 +141,25 @@ $('#cart-side').addEventListener('click', (e) => { if (e.target.id === 'place') 
 async function placeOrder(s) {
   const root = s ? s.el : $('#cart-side');
   const btn = root.querySelector('#place'), err = root.querySelector('#order-err');
-  btn.disabled = true; btn.textContent = 'Placing…'; err.textContent = '';
-  try {
-    const { order } = await api('/api/food/orders', { method: 'POST', body: { canteenId: canteen.id, note: root.querySelector('#note')?.value || '', items: cartLines().map((l) => ({ id: l.m.id, qty: l.qty })) } });
-    cart = {}; saveCart(); renderMenu(); renderCart(); if (s) s.close();
-    await loadOrders();
-    const done = sheet({ title: 'Order placed', body: `<div style="text-align:center"><p class="muted">Your token at ${esc(order.canteenName)}</p><p class="token" style="margin:8px 0">${esc(order.token)}</p>
-      <p>${pill(order.status)}</p><p class="muted small" style="margin-top:10px">We’ll show it here when it’s ready. Pay ${money(order.total)} at the counter when you collect.</p></div>`,
-      foot: '<button class="btn primary block" data-close>Done</button>' });
-    done.el.querySelector('.sheet-foot [data-close]').addEventListener('click', done.close);
-  } catch (x) { err.textContent = x.message; btn.disabled = false; btn.textContent = 'Place order · pay at counter'; if (x.code === 'OUT_OF_STOCK') loadMenu(); }
+  err.textContent = '';
+  const note = root.querySelector('#note')?.value || '', items = cartLines().map((l) => ({ id: l.m.id, qty: l.qty }));
+  if (s) s.close();
+  paySheet({
+    amount: cartTotal(), payee: canteen.name, phone: user.phone,
+    onPay: async (pay) => {
+      try {
+        const { order } = await api('/api/food/orders', { method: 'POST', body: { canteenId: canteen.id, note, items, pay } });
+        cart = {}; saveCart(); renderMenu(); renderCart(); loadOrders();
+        return { ref: order.payment.ref, after: () => showToken(order) };
+      } catch (x) { if (!String(x.code).startsWith('PAY')) { err.textContent = x.message; if (x.code === 'OUT_OF_STOCK') loadMenu(); } throw x; }
+    },
+  });
+}
+function showToken(order) {
+  const done = sheet({ title: 'Order placed', body: `<div style="text-align:center"><p class="muted">Your token at ${esc(order.canteenName)}</p><p class="token" style="margin:8px 0">${esc(order.token)}</p>
+    <p>${pill(order.status)} <span class="paid">✓ Paid ${money(order.total)}</span></p><p class="muted small" style="margin-top:10px">The kitchen has it. We’ll tell you here when it’s ready, then just show this token at the counter.</p></div>`,
+    foot: '<button class="btn primary block" data-close>Done</button>' });
+  done.el.querySelector('.sheet-foot [data-close]').addEventListener('click', done.close);
 }
 
 /* ---------- orders ---------- */
@@ -158,8 +167,8 @@ function renderActive() {
   const act = orders.filter((o) => ACTIVE.includes(o.status));
   $('#active').innerHTML = act.map((o) => `<div class="card row" style="${o.status === 'READY' ? 'border-color:var(--uh-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--uh-accent) 18%,transparent)' : ''}">
       <div><p class="muted small">Token</p><p class="token" style="font-size:32px">${esc(o.token)}</p></div>
-      <div class="grow"><b>${esc(o.canteenName)}</b> ${pill(o.status)}<p class="muted small">${esc(o.items.map((i) => `${i.qty}× ${i.name}`).join(', '))} · ${money(o.total)}</p>
-        ${o.status === 'READY' ? '<p class="small" style="margin-top:4px"><b>Ready at the counter.</b> Show this token and pay there.</p>' : ''}</div>
+      <div class="grow"><b>${esc(o.canteenName)}</b> ${pill(o.status)} ${o.payment?.status === 'PAID' ? `<span class="paid">✓ Paid ${money(o.total)}</span>` : o.payment?.status === 'REFUNDED' ? '<span class="pill">Refunded</span>' : ''}<p class="muted small">${esc(o.items.map((i) => `${i.qty}× ${i.name}`).join(', '))} · ${money(o.total)}</p>
+        ${o.status === 'READY' ? '<p class="small" style="margin-top:4px"><b>Ready at the counter.</b> Show this token to collect. Already paid.</p>' : ''}</div>
       ${o.status === 'PLACED' ? `<button class="btn danger sm" data-cancel="${o.id}">Cancel</button>` : ''}</div>`).join('');
 }
 function renderOrders() {

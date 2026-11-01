@@ -88,16 +88,24 @@ test('food: order, token, staff steps, handover, stock', async () => {
   const s = await student('asha2024@vitstudent.ac.in', 'Asha Rao', 'female');
   const menu = (await s('/api/food/canteens/foodys/menu')).body.items;
   const dosa = menu.find((m) => m.name === 'Masala Dosa');
-  const o = (await s('/api/food/orders', 'POST', { canteenId: 'foodys', items: [{ id: dosa.id, qty: 2 }] })).body.order;
-  assert.equal(o.total, 120); assert.match(o.token, /^F\d+$/);
+  const pay = { phone: '9876543210', otp: '123456' };
+  assert.equal((await s('/api/food/orders', 'POST', { canteenId: 'foodys', items: [{ id: dosa.id, qty: 2 }], pay: { ...pay, otp: '111111' } })).body.code, 'PAY_CODE', 'wrong code: no order');
+  assert.equal((await s('/api/food/orders', 'POST', { canteenId: 'foodys', items: [{ id: dosa.id, qty: 2 }] })).body.code, 'PAY_PHONE', 'no payment: no order');
+  const o = (await s('/api/food/orders', 'POST', { canteenId: 'foodys', items: [{ id: dosa.id, qty: 2 }], pay })).body.order;
+  assert.equal(o.total, 120); assert.match(o.token, /^F1$/, 'unpaid attempts use no token');
+  assert.equal(o.payment.status, 'PAID'); assert.equal(o.payment.amount, 120);
   const st = await staffLogin('foodys', 'Foodys@2026');
   assert.equal((await st(`/api/food/staff/orders/${o.id}/status`, 'POST', { status: 'READY' })).status, 409, 'no skipping steps');
   await st(`/api/food/staff/orders/${o.id}/status`, 'POST', { status: 'PREPARING' });
   await st(`/api/food/staff/orders/${o.id}/status`, 'POST', { status: 'READY' });
   assert.equal((await st('/api/food/staff/verify', 'POST', { token: o.token.toLowerCase() })).body.order.status, 'COMPLETED');
   await st(`/api/food/staff/menu/${dosa.id}`, 'PUT', { inStock: false });
-  assert.equal((await s('/api/food/orders', 'POST', { canteenId: 'foodys', items: [{ id: dosa.id, qty: 1 }] })).body.code, 'OUT_OF_STOCK');
-  assert.equal((await s('/api/hub/orders')).body.orders[0].token, o.token);
+  assert.equal((await s('/api/food/orders', 'POST', { canteenId: 'foodys', items: [{ id: dosa.id, qty: 1 }], pay })).body.code, 'OUT_OF_STOCK');
+  const idli = menu.find((m) => m.name !== 'Masala Dosa' && m.inStock);
+  const c = (await s('/api/food/orders', 'POST', { canteenId: 'foodys', items: [{ id: idli.id, qty: 1 }], pay })).body.order;
+  await s(`/api/food/orders/${c.id}/cancel`, 'POST');
+  assert.equal((await s('/api/food/orders/mine')).body.orders.find((x) => x.id === c.id).payment.status, 'REFUNDED');
+  assert.ok((await s('/api/hub/orders')).body.orders.some((x) => x.token === o.token));
 });
 
 test('xerox: page count, team price rules, shop queue, file privacy', async () => {
@@ -110,7 +118,8 @@ test('xerox: page count, team price rules, shop queue, file privacy', async () =
   const up = (await s('/api/xerox/files', 'POST', pdf, { 'content-type': 'application/pdf', 'x-filename': 'lab.pdf' })).body.file;
   assert.equal(up.pages, 3);
   assert.equal((await s('/api/xerox/files', 'POST', Buffer.from('nope'), { 'content-type': 'application/pdf' })).status, 400);
-  const o = (await s('/api/xerox/orders', 'POST', { shopId: 'prp', files: [{ fileId: up.id, copies: 1, color: 'color', sides: 'single' }] })).body.order;
+  const o = (await s('/api/xerox/orders', 'POST', { shopId: 'prp', files: [{ fileId: up.id, copies: 1, color: 'color', sides: 'single' }], pay: { phone: '+91 98765 43210', otp: '123456' } })).body.order;
+  assert.equal(o.payment.status, 'PAID');
   assert.equal(o.total, 30); assert.match(o.token, /^P\d+$/);
   const prp = await staffLogin('prp', 'PrpXerox@2026');
   assert.equal((await prp('/api/xerox/staff/queue')).body.orders.length, 1);

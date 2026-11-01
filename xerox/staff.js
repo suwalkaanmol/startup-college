@@ -43,7 +43,7 @@ async function start(staff) {
       <ul class="list" style="margin:10px 0">${o.files.map((f) => `<li class="small"><a href="/api/xerox/files/${esc(f.fileId)}" target="_blank" rel="noopener"><b>${esc(f.name)}</b></a><br>
         <span class="muted">Pages ${f.from}–${f.to} · ${f.copies} cop${f.copies === 1 ? 'y' : 'ies'} · ${f.color === 'bw' ? 'B&amp;W' : '<b style="color:var(--uh-text)">Colour</b>'} · ${f.sides === 'double' ? 'both sides' : 'one side'}${f.spiral ? ' · <b style="color:var(--uh-text)">spiral</b>' : ''} · ${f.sheets} sheets</span></li>`).join('')}</ul>
       ${o.note ? `<p class="notice small" style="margin-bottom:8px">“${esc(o.note)}”</p>` : ''}
-      <p class="small muted">${esc(o.studentName)} · ${esc(o.phone)} · <b class="num" style="color:var(--uh-text)">${money(o.total)}</b></p>
+      <p class="small muted">${esc(o.studentName)} · ${esc(o.phone)} · <b class="num" style="color:var(--uh-text)">${money(o.total)}</b> ${o.payment?.status === 'PAID' ? '<span class="paid">✓ Paid online</span>' : ''}</p>
       <div class="row" style="margin-top:10px">${btns}</div></article>`;
     const col = (title, list, btns) => `<section class="col"><h3><span>${title}</span><span class="pill">${list.length}</span></h3>${list.map((o) => ticket(o, btns(o))).join('') || '<p class="muted small" style="padding:4px">Nothing here.</p>'}</section>`;
     $('#board').innerHTML = col('In queue', by('QUEUED'), (o) => `<button class="btn primary sm" data-st="PRINTING" data-id="${o.id}">Start printing</button><button class="btn danger sm" data-st="CANCELLED" data-id="${o.id}">Reject</button>`)
