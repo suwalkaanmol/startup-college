@@ -77,3 +77,14 @@ html[data-unihub-module="pg"] body { background: var(--uh-bg); }
 html[data-unihub-module="pg"] .bar { border-bottom-color: var(--uh-line); background: var(--uh-surface); }
 html[data-unihub-module="pg"] .btn { background: var(--g-brand); color: #fff; box-shadow: 0 8px 20px rgba(29, 56, 163, .28); }
 html[data-unihub-module="pg"] .wrap h1 { font-size: 34px; }
+
+/* Corner link the hub adds to a module page, e.g. Xerox "Shop Staff Login" */
+.uh-corner {
+  position: absolute; z-index: 2147483000; top: max(10px, env(safe-area-inset-top, 0px)); right: max(12px, env(safe-area-inset-right, 0px));
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px;
+  background: var(--uh-surface); color: var(--uh-accent); border: 1.5px solid var(--uh-line);
+  font: 600 12.5px/1 var(--f-body); text-decoration: none; box-shadow: 0 4px 14px rgba(14, 29, 85, .12);
+}
+.uh-corner.left { right: auto; left: max(12px, env(safe-area-inset-left, 0px)); }
+.uh-corner:hover { border-color: var(--uh-accent); }
+.uh-corner:focus-visible { outline: 3px solid var(--u-300); outline-offset: 2px; }

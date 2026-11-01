@@ -18,11 +18,12 @@ Students then land in PlaceMate already signed in. Before step 2, the PG card op
 2. You: in `hub/.env` set `TRAVEL_API_URL` to that address and `TRAVEL_JWT_SECRET` to that `JWT_SECRET`.
 UniHub forwards Travel's requests and live chat to that server, so `travel/config.js` needs no edit and there are no cross-site (CORS) settings to change.
 
-## Xerox: a Supabase project
-1. Xerox team: create a free Supabase project. Auth > Providers: turn on Anonymous sign-ins.
-2. SQL Editor: run every file in `xerox/source/supabase/migrations` in order (001 to 009).
-3. Add shop owner accounts as in `xerox/source/README.md`.
-4. You: put the project URL and anon key in `hub/.env` as `XEROX_SUPABASE_URL` and `XEROX_SUPABASE_ANON_KEY`. UniHub serves them to the Xerox pages, so the two `config.js` files stay untouched. Xerox orders then also show in each student's order history.
+## Xerox: connected
+The Xerox team's Supabase project is already filled in (`xerox/config.js` and `xerox/owner/config.js`, a publishable key that is safe to be public). To finish:
+1. Xerox team: in that Supabase project, make sure Anonymous sign-ins are on and every file in `xerox/source/supabase/migrations` (001 to 009) has been run.
+2. Shop staff accounts: Supabase > Auth > Users > Add user (email + password) for each shop, then `insert into shop_owners (user_id, shop_id) values ('<user uuid>', 'prp');` (shop ids: prp, tt, ganga, little, h-block, j-block). There are no default staff passwords.
+3. Staff sign in from the "🔒 Shop Staff Login" button in the corner of the Xerox page (`xerox/owner/index.html`), choose their shop, and see its queue.
+To switch projects later, set `XEROX_SUPABASE_URL` and `XEROX_SUPABASE_ANON_KEY` in `hub/.env`; UniHub then serves those instead.
 
 ## Email codes
 Set `SMTP_URL` and `MAIL_FROM`. With Gmail: turn on 2-step verification, create an app password, and use `smtps://you%40gmail.com:APP_PASSWORD@smtp.gmail.com:465`.

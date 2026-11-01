@@ -3,7 +3,8 @@
    - applies the light/dark choice made in the hub profile, and passes it to the module's own theme key
    - sends signed-out students back to the hub sign-in (data-gate="student"; owner pages leave it off)
    - adds a floating "Campus Hub" button when data-back="on" (for pages without their own back link)
-   - canteen staff can open food/index.html#staff without a student sign-in */
+   - canteen staff can open food/index.html#staff without a student sign-in
+   - adds a corner link when data-corner-href is set (Xerox uses it for the shop staff login) */
 (function () {
   var s = document.currentScript;
   var mod = (s && s.getAttribute('data-module')) || '';
@@ -31,5 +32,15 @@
     a.setAttribute('aria-label', 'Back to Campus Hub');
     document.body.appendChild(a);
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', addBack); else addBack();
+  // Optional corner button: data-corner-href + data-corner-label (e.g. the shop staff login).
+  function addCorner() {
+    var href = s && s.getAttribute('data-corner-href');
+    if (!href || document.querySelector('.uh-corner')) return;
+    var a = document.createElement('a');
+    a.className = 'uh-corner' + (s.getAttribute('data-corner-side') === 'left' ? ' left' : ''); a.href = href;
+    a.textContent = s.getAttribute('data-corner-label') || 'Staff login';
+    document.body.appendChild(a);
+  }
+  function ready() { addBack(); addCorner(); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready); else ready();
 })();

@@ -165,7 +165,7 @@ export function createApp(cfg = makeConfig(), deps = {}) {
 
     if (p === '/api/hub/status' && m === 'GET') {
       return send(res, 200, {
-        xerox: Boolean(cfg.xeroxSupabaseUrl && cfg.xeroxSupabaseKey),
+        xerox: Boolean(cfg.xeroxSupabaseUrl && cfg.xeroxSupabaseKey) || xeroxFileConfigured(),
         food: true,
         travel: Boolean(cfg.travelApiUrl),
         pg: Boolean(cfg.pgUrl),
@@ -326,6 +326,11 @@ export function createApp(cfg = makeConfig(), deps = {}) {
       return fail(res, 500, 'SERVER', 'Something went wrong on our side.');
     }
   });
+  // Xerox counts as connected when hub/.env or xerox/config.js names a Supabase project.
+  function xeroxFileConfigured() {
+    try { return /supabaseUrl:\s*'https:\/\//.test(fs.readFileSync(path.join(SITE_ROOT, 'xerox', 'config.js'), 'utf8')); } catch { return false; }
+  }
+
   // Module settings that used to be edited by hand now come from hub/.env.
   function runtimeConfig(pathname) {
     if (pathname === '/xerox/config.js' || pathname === '/xerox/owner/config.js') {
