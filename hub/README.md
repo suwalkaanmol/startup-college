@@ -48,7 +48,7 @@ Copy `.env.example` to `.env` and fill in what you need.
 - **Xerox** and **Food** open directly. They keep their own servers (Supabase for Xerox, the UniHub canteen backend for Food).
 - **Travel**: the hub signs a token with `TRAVEL_JWT_SECRET` and opens `travel/index.html#token=...`, which Travel's code already reads. The hub forwards Travel's API and websockets to `TRAVEL_API_URL`.
 - **PG**: the hub signs a 5-minute token with `UNIHUB_SSO_SECRET` and opens `PG_URL/sso?token=...`, the hand-off PlaceMate already supports.
-- **VIT Nav**: `nav/index.html`, a PRP level 6 plan. `nav/index.html#room=614` opens on a room; the home screen's room search uses this. Editing comes later.
+- **VIT Nav**: `nav/index.html`, a PRP level 6 plan. `nav/index.html#room=614` opens on a room. Editing comes later.
 
 Until the Travel and PG secrets are set, those tiles still open (Travel as a guest, PG on its start page) and the hub shows a note.
 

@@ -167,14 +167,6 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 
 .toast { position: fixed; z-index: 60; left: 50%; bottom: max(20px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--u-900); color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 14px; box-shadow: var(--uh-shadow); max-width: calc(100% - 32px); }
 
-/* Room search on the home screen */
-.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.roomfind { margin-top: 18px; display: flex; align-items: center; gap: 10px; max-width: 560px; padding: 6px 6px 6px 14px; background: var(--uh-surface); border: 1.5px solid var(--uh-line); border-radius: 16px; box-shadow: var(--uh-shadow); }
-.roomfind:focus-within { border-color: var(--uh-accent); }
-.roomfind svg { width: 20px; height: 20px; flex: none; fill: none; stroke: var(--uh-accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.roomfind input { border: 0 !important; box-shadow: none !important; padding: 10px 4px !important; background: transparent !important; min-width: 0; flex: 1; }
-.roomfind .btn.primary { width: auto; margin: 0; padding: 11px 16px; white-space: nowrap; }
-@media (max-width: 420px) { .roomfind .btn.primary { padding: 11px 12px; } }
 
 .danger-zone { margin-top: 14px; border: 1px solid var(--uh-line); border-radius: 12px; padding: 10px 14px; }
 .danger-zone summary { cursor: pointer; color: var(--uh-muted); font-size: 14px; font-weight: 500; }

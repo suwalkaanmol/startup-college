@@ -273,17 +273,6 @@ $$('.tile').forEach((t) => t.addEventListener('click', async (e) => {
   }
 }));
 
-// Room search: opens VIT Nav on that room.
-$('#roomfind').addEventListener('submit', (e) => {
-  e.preventDefault();
-  const v = $('#room-q').value.trim().toUpperCase().replace(/^PRP\s*/, '');
-  const err = $('#room-err');
-  if (!v) { err.textContent = 'Type a room number, like 623.'; $('#room-q').focus(); return; }
-  if (!/^6\d{2}[A-Z]?$/.test(v)) { err.textContent = 'VIT Nav has PRP level 6 for now: rooms 601 to 678.'; $('#room-q').focus(); return; }
-  location.href = 'nav/index.html#room=' + encodeURIComponent(v);
-});
-$('#room-q').addEventListener('input', () => { $('#room-err').textContent = ''; });
-
 /* ---------------- drawer ---------------- */
 let lastFocus = null;
 function fillInfo() {
