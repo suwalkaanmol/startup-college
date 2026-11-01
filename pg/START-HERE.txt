@@ -1,0 +1,12 @@
+1. Right-click placemate.zip > Extract All (do not run it from inside the zip).
+2. Open the extracted folder and double-click START-PLACEMATE.bat.
+3. First time only: it installs, then asks for your Neon DATABASE_URL once. Paste it and press Enter.
+4. The browser opens at http://localhost:4000. Keep the black window open while you use the app.
+Next time: just double-click START-PLACEMATE.bat.
+To update later: extract the new zip, then copy the old server\.env into the new server folder once (or paste the URL again).
+
+BEFORE REAL STUDENTS USE IT (legal checklist)
+- Your real business details: copy client\.env.example to client\.env, fill every line, then start again (it rebuilds by itself). Until then the footer and legal pages show "TODO ..." placeholders.
+- Have a lawyer read the Privacy Policy, Terms, Refund and Cookie pages.
+- Name a real grievance officer and check that mailbox.
+- Turn the test start screen off online (do not set ALLOW_DEV_LOGIN=true) and connect the real UniHub login.
