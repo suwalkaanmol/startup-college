@@ -1,0 +1,15 @@
+{
+  "name": "unihub",
+  "private": true,
+  "version": "1.0.0",
+  "description": "UniHub: one sign-in for the Startup College campus modules (VIT Vellore).",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/hub.test.js"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {}
+}
