@@ -1,9 +1,9 @@
-# Render Blueprint for UniHub (the main app). New > Blueprint > pick this repo, path hub/render.yaml
+# Render Blueprint for UniHub. New > Blueprint > pick this repo, path hub/render.yaml
 services:
   - type: web
     name: unihub
     runtime: node
-    plan: starter            # a paid plan keeps the disk below; free plans lose accounts on restart
+    plan: starter            # a paid plan keeps the disk below; free plans lose data on restart
     buildCommand: echo "no build step"
     startCommand: node hub/server.js
     healthCheckPath: /api/health
@@ -18,13 +18,9 @@ services:
         value: /var/data/hub.json
       - key: JWT_SECRET
         generateValue: true
+      - key: ADMIN_PASSWORD
+        sync: false          # the admin login's password (8+ chars, letters and numbers)
       - key: SMTP_URL
         sync: false          # e.g. smtps://you%40gmail.com:APP_PASSWORD@smtp.gmail.com:465
       - key: MAIL_FROM
         sync: false
-      - key: TRAVEL_JWT_SECRET
-        sync: false          # same value as JWT_SECRET on the Travel service
-      - key: UNIHUB_SSO_SECRET
-        sync: false          # same value as on the PlaceMate service
-      - key: PG_URL
-        value: https://placemate-x6pt.onrender.com

@@ -185,32 +185,7 @@ function greet() {
   $('#avatar-initials').textContent = ini; $('#drawer-initials').textContent = ini;
 }
 
-const FOOD_ACTIVE = /PENDING|PLACED|PREPARING|READY|ACCEPTED|CONFIRMED/;
-function foodOrders() {
-  let list = [];
-  try { list = JSON.parse(store.get('food_student_orders') || '[]'); } catch { list = []; }
-  return (Array.isArray(list) ? list : []).filter((o) => o && (o.id || o.daily_token)).map((o) => ({
-    source: 'food', id: 'f' + (o.id || o.daily_token), token: o.daily_token || '—', status: String(o.status || '').toUpperCase(),
-    amount: Number(o.total_amount) || 0, at: o.created_at || o.token_date || null, title: 'Canteen order',
-  }));
-}
-async function xeroxOrders() {
-  const cfg = window.XEROX_CONFIG || {};
-  let session = null;
-  try { session = JSON.parse(store.get('xerox-student-auth') || 'null'); } catch { session = null; }
-  const token = session?.access_token || session?.currentSession?.access_token;
-  if (!cfg.supabaseUrl || !cfg.supabaseAnonKey || !token) return [];
-  try {
-    const r = await fetch(`${cfg.supabaseUrl}/rest/v1/orders?select=id,token,total,status,created_at,shops(name)&status=neq.pending_payment&order=created_at.desc&limit=30`, {
-      headers: { apikey: cfg.supabaseAnonKey, Authorization: `Bearer ${token}` },
-    });
-    if (!r.ok) return [];
-    return (await r.json()).map((o) => ({
-      source: 'xerox', id: 'x' + o.id, token: o.token, status: String(o.status || '').toUpperCase(),
-      amount: Number(o.total) || 0, at: o.created_at, title: o.shops?.name ? `Print · ${o.shops.name}` : 'Print order',
-    }));
-  } catch { return []; }
-}
+const FOOD_ACTIVE = /PLACED|PREPARING|READY|QUEUED|PRINTING/;
 let allOrders = [];
 let orderFilter = 'all';
 const ICONS = {
@@ -218,7 +193,7 @@ const ICONS = {
   xerox: '<svg viewBox="0 0 24 24"><path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 14h10v7H7z"/></svg>',
 };
 function statusPill(s) {
-  const label = cap(s.toLowerCase().replace(/_/g, ' ')) || 'Placed';
+  const label = { READY: 'Ready to collect', QUEUED: 'In queue', COMPLETED: 'Collected' }[s] || cap(s.toLowerCase().replace(/_/g, ' ')) || 'Placed';
   const cls = /COMPLETED|DELIVERED|COLLECTED|PICKED/.test(s) ? 'ok' : /CANCEL|REJECT|FAIL/.test(s) ? 'bad' : 'live';
   return `<span class="pill ${cls}">${label}</span>`;
 }
@@ -238,39 +213,23 @@ function renderOrders() {
   }
   ul.innerHTML = list.map((o) => `<li>
     <span class="o-ico ${o.source}" aria-hidden="true">${ICONS[o.source]}</span>
-    <span class="o-main"><b>${esc(o.title)} · Token ${esc(o.token)}</b><span>${esc(when(o.at))}</span><br>${statusPill(o.status)}</span>
+    <span class="o-main"><b>${esc(o.title)} · Token ${esc(o.token)}</b><span>${esc(when(o.at))}${o.detail ? ' · ' + esc(o.detail) : ''}</span><br>${statusPill(o.status)}</span>
     <span class="o-amt">₹${Math.round(o.amount)}</span></li>`).join('');
 }
 async function loadOrders() {
-  const x = await xeroxOrders();
-  allOrders = [...foodOrders(), ...x].sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0));
+  try { ({ orders: allOrders } = await api('/orders')); } catch { allOrders = []; }
   renderOrders();
   const live = allOrders.find((o) => FOOD_ACTIVE.test(o.status));
   const box = $('#activity');
   if (live) {
     box.hidden = false;
-    box.innerHTML = `${statusPill(live.status)}<span><b>${esc(live.title)}</b> · Token ${esc(live.token)} · ${esc(when(live.at))}</span>`;
+    box.innerHTML = `${statusPill(live.status)}<span><b>${esc(live.title)}</b> · Token ${esc(live.token)} · ${esc(when(live.at))}</span><a class="link" style="margin-left:auto" href="${live.source}/index.html">Open</a>`;
   } else box.hidden = true;
 }
 $$('.chip').forEach((c) => c.addEventListener('click', () => {
   orderFilter = c.dataset.filter;
   $$('.chip').forEach((x) => x.setAttribute('aria-pressed', String(x === c)));
   renderOrders();
-}));
-
-// Travel and PG need a signed hand-off from the hub; the rest are plain links.
-$$('.tile').forEach((t) => t.addEventListener('click', async (e) => {
-  const mod = t.dataset.open;
-  if (mod !== 'travel' && mod !== 'pg') return;
-  e.preventDefault();
-  t.classList.add('busy'); $('#open-note').textContent = `Opening ${cap(mod)}…`;
-  try {
-    const r = await api('/sso/' + mod);
-    if (!r.linked && r.note) store.set('hub_last_note', r.note);
-    location.href = r.url;
-  } catch (x) {
-    t.classList.remove('busy'); $('#open-note').textContent = x.message;
-  }
 }));
 
 /* ---------------- drawer ---------------- */
@@ -351,21 +310,6 @@ $('#delete-form').addEventListener('submit', async (e) => {
 });
 $('#del-confirm').addEventListener('input', () => { $('#del-error').textContent = ''; });
 
-// Cards whose server isn't set up yet say so, so nobody lands on an error.
-async function markConnections() {
-  let st;
-  try { st = await fetch('/api/hub/status').then((r) => r.json()); } catch { return; }
-  ['xerox', 'food', 'travel', 'pg'].forEach((k) => {
-    const t = $(`.tile[data-open="${k}"]`); if (!t) return;
-    let b = $('.tile-badge', t);
-    if (st[k] === false) {
-      if (!b) { b = document.createElement('span'); b.className = 'tile-badge'; t.appendChild(b); }
-      b.textContent = 'Not connected yet';
-      t.setAttribute('aria-description', 'This section’s server isn’t set up yet, so it can’t load data.');
-    } else if (b) b.remove();
-  });
-}
-
 /* ---------------- routing ---------------- */
 function route() {
   if (!me) { show('screen-auth'); $('#email').focus(); return; }
@@ -373,9 +317,7 @@ function route() {
     fillForm($('#onboard-form'), me); $('#ob-email').value = me.email;
     show('screen-onboard'); $('#ob-name').focus(); return;
   }
-  greet(); show('screen-main'); loadOrders(); markConnections();
-  const note = store.get('hub_last_note');
-  if (note) { $('#open-note').textContent = note; store.del('hub_last_note'); }
+  greet(); show('screen-main'); loadOrders();
 }
 
 // Installable app: cache the hub so it opens even on a weak connection.

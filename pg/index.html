@@ -1,27 +1,17 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><script src="../hub/web/sync.js" data-module="pg" data-gate="student"></script>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PlaceMate - PG &amp; Roommates</title>
-  <link rel="stylesheet" href="./style.css">
-<link rel="stylesheet" href="../hub/web/theme.css"></head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <script src="../hub/web/sync.js" data-module="pg" data-gate="student"></script>
+  <title>PG & roommates · UniHub</title>
+  <meta name="theme-color" content="#1d38a3">
+  <link rel="icon" href="../hub/web/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../hub/web/theme.css">
+  <link rel="stylesheet" href="../hub/web/kit.css">
+  <script type="module" src="app.js"></script>
+</head>
 <body>
-  <header class="bar">
-    <a href="../index.html" class="back">&larr; Back to Campus Hub</a>
-  </header>
-  <main class="wrap">
-    <h1>PlaceMate</h1>
-    <p class="lead">Find same-gender VIT roommates near your office, chat in groups, and book a PG together. Earn 100 credits for each confirmed booking.</p>
-    <ul class="points">
-      <li>Match with students whose move-in dates overlap yours</li>
-      <li>Form groups of 2 to 6 and chat</li>
-      <li>Pick roommates by mutual choice</li>
-      <li>Book a PG together</li>
-    </ul>
-    <a id="open" class="btn" href="https://placemate-x6pt.onrender.com" rel="noopener">Open PlaceMate</a>
-    <p class="note">Full source code of this module is in the <a href="./README.md">README</a>.</p>
-    <p class="note">The first load can take up to a minute while the server wakes up.</p>
-  </main>
+  <main class="wrap" id="app" aria-live="polite"><p class="muted">Loading…</p></main>
 </body>
 </html>

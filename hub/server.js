@@ -1,10 +1,9 @@
-// UniHub server: email-code sign-in for @vitstudent.ac.in, student profiles,
-// signed hand-off tokens for the Travel and PG modules, and the static campus site.
+// UniHub server: one server for the whole campus app.
+// - Students sign in with a @vitstudent.ac.in email and an emailed 6-digit code.
+// - Food, Xerox, Travel and PG run here, with one database (hub/data/hub.json) and live updates.
+// - Canteen staff, Xerox shop staff and admins sign in with a staff ID and password.
 // Zero dependencies: Node 20+ only.
 import http from 'node:http';
-import https from 'node:https';
-import net from 'node:net';
-import tls from 'node:tls';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -12,6 +11,14 @@ import { fileURLToPath } from 'node:url';
 import { sign, verify } from './lib/jwt.js';
 import { sendMail } from './lib/mailer.js';
 import { createStore } from './lib/store.js';
+import { createLive } from './lib/live.js';
+import { HttpError, send, fail, readJson, cookies, clientIp, limiter } from './lib/http.js';
+import { seed } from './seed.js';
+import food from './routes/food.js';
+import xerox from './routes/xerox.js';
+import travel from './routes/travel.js';
+import pg from './routes/pg.js';
+import staffRoutes from './routes/staff.js';
 
 const HUB_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SITE_ROOT = path.resolve(HUB_DIR, '..');
@@ -20,7 +27,7 @@ const SITE_ROOT = path.resolve(HUB_DIR, '..');
 function loadEnvFile(file) {
   try {
     for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
-      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+      const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*(#.*)?$/);
       if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
     }
   } catch { /* no .env */ }
@@ -40,17 +47,12 @@ export function makeConfig(env = process.env) {
     smtpUrl: env.SMTP_URL || '',
     mailFrom: env.MAIL_FROM || 'UniHub <no-reply@unihub.local>',
     showDevCodes: env.DEV_SHOW_CODES ? env.DEV_SHOW_CODES === 'true' : !production,
-    travelSecret: env.TRAVEL_JWT_SECRET || '',
-    pgSecret: env.UNIHUB_SSO_SECRET || '',
-    pgUrl: (env.PG_URL || 'https://placemate-x6pt.onrender.com').replace(/\/$/, ''),
-    travelApiUrl: (env.TRAVEL_API_URL || '').replace(/\/$/, ''),
-    xeroxSupabaseUrl: env.XEROX_SUPABASE_URL || '',
-    xeroxSupabaseKey: env.XEROX_SUPABASE_ANON_KEY || '',
+    adminPassword: env.ADMIN_PASSWORD || '',
     dataFile: env.DATA_FILE || path.join(HUB_DIR, 'data', 'hub.json'),
   };
 }
 
-// ---------- validation ----------
+// ---------- student profile rules ----------
 export const rules = {
   email(v, domain) {
     const e = String(v || '').trim().toLowerCase();
@@ -81,59 +83,43 @@ export const rules = {
     return { value: s };
   },
 };
+const complete = (u) => Boolean(u.name && u.phone && u.regNo && u.gender);
+const publicUser = (u) => ({ id: u.id, email: u.email, name: u.name, phone: u.phone, regNo: u.regNo, gender: u.gender, complete: complete(u), createdAt: u.createdAt });
 
-const publicUser = (u) => ({
-  id: u.id, email: u.email, name: u.name, phone: u.phone, regNo: u.regNo, gender: u.gender,
-  complete: Boolean(u.name && u.phone && u.regNo && u.gender), createdAt: u.createdAt,
-});
-
-// ---------- small helpers ----------
+// ---------- static files ----------
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.webmanifest': 'application/manifest+json',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
-  '.ico': 'image/x-icon', '.map': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.txt': 'text/plain; charset=utf-8',
+  '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.txt': 'text/plain; charset=utf-8',
 };
-const PUBLIC_TOP = new Set(['', 'index.html', 'sw.js', 'manifest.webmanifest', 'food', 'travel', 'xerox', 'pg', 'nav', 'hub']);
+const PUBLIC_TOP = new Set(['', 'index.html', 'sw.js', 'manifest.webmanifest', 'food', 'travel', 'xerox', 'pg', 'nav', 'admin', 'hub']);
 const BLOCKED = [
-  /(^|\/)\./, /node_modules/, /\.(md|bat|sql|env|lock|log)$/i, /(^|\/)package(-lock)?\.json$/i,
-  /^\/hub\/(?!web\/)/, /^\/(travel|pg)\/server(\/|$)/, /^\/pg\/(client|scripts)(\/|$)/,
-  /^\/xerox\/(source|unihub-print|apps|packages|supabase|scripts)(\/|$)/, /^\/food\/(src|scripts|dist)(\/|$)/,
-  /^\/travel\/(client|render\.yaml)(\/|$)/,
+  /(^|\/)\./, /node_modules/, /\.(md|bat|sql|env|lock|log|map)$/i, /(^|\/)package(-lock)?\.json$/i,
+  /^\/hub\/(?!web\/)/,
 ];
 
-function send(res, status, body, headers = {}) {
-  const isObj = body && typeof body === 'object' && !Buffer.isBuffer(body);
-  res.writeHead(status, { 'Content-Type': isObj ? 'application/json; charset=utf-8' : 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', ...headers });
-  res.end(isObj ? JSON.stringify(body) : body);
-}
-const fail = (res, status, code, message) => send(res, status, { error: message, code });
-
-function readJson(req, limit = 10_000) {
-  return new Promise((resolve, reject) => {
-    if (!/application\/json/i.test(req.headers['content-type'] || '')) return reject(Object.assign(new Error('JSON body required'), { status: 415 }));
-    let size = 0; const chunks = [];
-    req.on('data', (c) => { size += c.length; if (size > limit) { reject(Object.assign(new Error('Body too large'), { status: 413 })); req.destroy(); } else chunks.push(c); });
-    req.on('end', () => { try { resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {}); } catch { reject(Object.assign(new Error('Bad JSON'), { status: 400 })); } });
-    req.on('error', reject);
-  });
-}
-function cookies(req) {
-  const out = {};
-  for (const part of String(req.headers.cookie || '').split(';')) {
-    const i = part.indexOf('='); if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
-  }
-  return out;
-}
-function clientIp(req) { return String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || 'unknown'; }
-
-function limiter(windowMs, max) {
-  const hits = new Map();
-  return (key) => {
-    const now = Date.now();
-    const h = hits.get(key);
-    if (!h || now - h.start > windowMs) { hits.set(key, { start: now, n: 1 }); return true; }
-    h.n += 1; return h.n <= max;
+// ---------- a tiny router ----------
+function createRouter() {
+  const routes = [];
+  const add = (method) => (pattern, auth, handler) => {
+    const keys = [];
+    const re = new RegExp('^' + pattern.replace(/:([a-zA-Z]+)/g, (_, k) => { keys.push(k); return '([^/]+)'; }) + '$');
+    routes.push({ method, re, keys, auth, handler });
+  };
+  return {
+    HANDLED: Symbol('handled'),
+    get: add('GET'), post: add('POST'), put: add('PUT'), del: add('DELETE'),
+    match(method, pathname) {
+      let allowed = false;
+      for (const r of routes) {
+        const m = pathname.match(r.re); if (!m) continue;
+        if (r.method !== method) { allowed = true; continue; }
+        const params = {}; r.keys.forEach((k, i) => { params[k] = decodeURIComponent(m[i + 1]); });
+        return { route: r, params };
+      }
+      return allowed ? { notAllowed: true } : null;
+    },
   };
 }
 
@@ -141,149 +127,146 @@ function limiter(windowMs, max) {
 export function createApp(cfg = makeConfig(), deps = {}) {
   const store = deps.store || createStore(cfg.dataFile);
   const mail = deps.sendMail || sendMail;
+  const live = createLive();
+  const log = deps.log || console.log;
+  seed(store, cfg, log);
+
   const ipCodeLimit = limiter(15 * 60e3, 20);
   const ipVerifyLimit = limiter(15 * 60e3, 60);
   const hashCode = (email, code) => crypto.createHmac('sha256', cfg.jwtSecret).update(`${email}:${code}`).digest('hex');
-  const SESSION_DAYS = 30;
+  const secure = (req) => cfg.production || req.headers['x-forwarded-proto'] === 'https';
+  const cookie = (req, name, value, maxAge) => `${name}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure(req) ? '; Secure' : ''}`;
+  const addCookie = (res, c) => { const prev = res.getHeader('Set-Cookie'); res.setHeader('Set-Cookie', prev ? [].concat(prev, c) : c); };
 
-  const secureCookie = (req) => cfg.production || req.headers['x-forwarded-proto'] === 'https';
-  const setSession = (req, res, u) => {
-    const t = sign({ sub: u.id }, cfg.jwtSecret, { expiresInSec: SESSION_DAYS * 86400 });
-    res.setHeader('Set-Cookie', `hub_session=${t}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DAYS * 86400}${secureCookie(req) ? '; Secure' : ''}`);
+  const sessions = {
+    student(req) { const c = verify(cookies(req).hub_session, cfg.jwtSecret); return c && !c.typ ? store.userById(c.sub) : null; },
+    staff(req) { const c = verify(cookies(req).hub_staff, cfg.jwtSecret); return c && c.typ === 'staff' ? store.get('staff', c.sub) : null; },
   };
-  const clearSession = (req, res) => res.setHeader('Set-Cookie', `hub_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secureCookie(req) ? '; Secure' : ''}`);
-  const currentUser = (req) => {
-    const c = verify(cookies(req).hub_session, cfg.jwtSecret);
-    return c ? store.userById(c.sub) : null;
+  const ctx = {
+    store, live, cfg,
+    setStaffSession(req, res, s) { addCookie(res, cookie(req, 'hub_staff', sign({ sub: s.id, typ: 'staff' }, cfg.jwtSecret, { expiresInSec: 12 * 3600 }), 12 * 3600)); },
+    clearStaffSession(req, res) { addCookie(res, cookie(req, 'hub_staff', '', 0)); },
   };
 
-  async function api(req, res, url) {
-    const p = url.pathname;
-    const m = req.method;
+  const r = createRouter();
+  const modules = [food(r, ctx), xerox(r, ctx), travel(r, ctx), pg(r, ctx), staffRoutes(r, ctx)];
 
-    if (p === '/api/health' && m === 'GET') return send(res, 200, { ok: true });
+  // ---------- student sign-in ----------
+  r.get('/api/health', null, () => ({ ok: true }));
+  r.get('/api/hub/config', null, () => ({ appName: cfg.appName, domain: cfg.domain, devCodes: cfg.showDevCodes && !cfg.smtpUrl, mail: Boolean(cfg.smtpUrl) }));
 
-    if (p === '/api/hub/status' && m === 'GET') {
-      return send(res, 200, {
-        xerox: Boolean(cfg.xeroxSupabaseUrl && cfg.xeroxSupabaseKey) || xeroxFileConfigured(),
-        food: true,
-        travel: Boolean(cfg.travelApiUrl),
-        pg: Boolean(cfg.pgUrl),
-        signedHandoff: { travel: Boolean(cfg.travelSecret), pg: Boolean(cfg.pgSecret) },
-      });
-    }
-
-    if (p === '/api/hub/config' && m === 'GET') {
-      return send(res, 200, { appName: cfg.appName, domain: cfg.domain, devCodes: cfg.showDevCodes && !cfg.smtpUrl, mail: Boolean(cfg.smtpUrl) });
-    }
-
-    if (p === '/api/hub/auth/request-code' && m === 'POST') {
-      if (!ipCodeLimit(clientIp(req))) return fail(res, 429, 'RATE_LIMIT', 'Too many code requests from this network. Try again in 15 minutes.');
-      const body = await readJson(req);
-      const e = rules.email(body.email, cfg.domain);
-      if (e.error) return fail(res, 400, 'BAD_EMAIL', e.error);
-      const now = Date.now();
-      const prev = store.getCode(e.value);
-      if (prev && now - prev.sentAt < 30e3) return fail(res, 429, 'WAIT', `Wait ${Math.ceil((30e3 - (now - prev.sentAt)) / 1000)} seconds before asking for another code.`);
-      const hourStart = prev && now - prev.hourStart < 3600e3 ? prev.hourStart : now;
-      const hourCount = prev && hourStart === prev.hourStart ? prev.hourCount + 1 : 1;
-      if (hourCount > 6) return fail(res, 429, 'RATE_LIMIT', 'Too many codes for this email. Try again in an hour.');
-      const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
-      store.setCode(e.value, { hash: hashCode(e.value, code), exp: now + 10 * 60e3, tries: 0, sentAt: now, hourStart, hourCount });
-      if (cfg.smtpUrl) {
-        try {
-          await mail(cfg.smtpUrl, {
-            from: cfg.mailFrom, to: e.value, subject: `${code} is your ${cfg.appName} code`,
-            text: `Your ${cfg.appName} sign-in code is ${code}.\n\nIt expires in 10 minutes. If you didn't ask for it, ignore this email.`,
-            html: `<div style="font-family:Arial,sans-serif;font-size:15px;color:#14204a"><p>Your ${cfg.appName} sign-in code is</p><p style="font-size:30px;letter-spacing:6px;font-weight:bold;color:#1f3fae">${code}</p><p>It expires in 10 minutes. If you didn't ask for it, you can ignore this email.</p></div>`,
-          });
-        } catch (err) {
-          console.error('[mail]', err.message);
-          store.dropCode(e.value);
-          return fail(res, 502, 'MAIL_FAILED', 'We couldn’t send the email just now. Try again in a minute.');
-        }
-        return send(res, 200, { sent: true, email: e.value });
+  r.post('/api/hub/auth/request-code', null, async ({ req }) => {
+    if (!ipCodeLimit(clientIp(req))) throw new HttpError(429, 'RATE_LIMIT', 'Too many code requests from this network. Try again in 15 minutes.');
+    const body = await readJson(req);
+    const e = rules.email(body.email, cfg.domain);
+    if (e.error) throw new HttpError(400, 'BAD_EMAIL', e.error);
+    const t = Date.now(); const prev = store.getCode(e.value);
+    if (prev && t - prev.sentAt < 30e3) throw new HttpError(429, 'WAIT', `Wait ${Math.ceil((30e3 - (t - prev.sentAt)) / 1000)} seconds before asking for another code.`);
+    const hourStart = prev && t - prev.hourStart < 3600e3 ? prev.hourStart : t;
+    const hourCount = prev && hourStart === prev.hourStart ? prev.hourCount + 1 : 1;
+    if (hourCount > 6) throw new HttpError(429, 'RATE_LIMIT', 'Too many codes for this email. Try again in an hour.');
+    const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+    store.setCode(e.value, { hash: hashCode(e.value, code), exp: t + 10 * 60e3, tries: 0, sentAt: t, hourStart, hourCount });
+    if (cfg.smtpUrl) {
+      try {
+        await mail(cfg.smtpUrl, {
+          from: cfg.mailFrom, to: e.value, subject: `${code} is your ${cfg.appName} code`,
+          text: `Your ${cfg.appName} sign-in code is ${code}.\n\nIt expires in 10 minutes. If you didn't ask for it, ignore this email.`,
+          html: `<div style="font-family:Arial,sans-serif;font-size:15px;color:#14204a"><p>Your ${cfg.appName} sign-in code is</p><p style="font-size:30px;letter-spacing:6px;font-weight:bold;color:#1f3fae">${code}</p><p>It expires in 10 minutes. If you didn't ask for it, you can ignore this email.</p></div>`,
+        });
+      } catch (err) {
+        log('[mail] ' + err.message); store.dropCode(e.value);
+        throw new HttpError(502, 'MAIL_FAILED', 'We couldn’t send the email just now. Try again in a minute.');
       }
-      if (cfg.showDevCodes) {
-        console.log(`[dev] sign-in code for ${e.value}: ${code}`);
-        return send(res, 200, { sent: true, email: e.value, devCode: code });
-      }
-      store.dropCode(e.value);
-      return fail(res, 503, 'MAIL_OFF', 'Email sign-in isn’t set up on this server yet.');
+      return { sent: true, email: e.value };
     }
+    if (cfg.showDevCodes) { log(`[dev] sign-in code for ${e.value}: ${code}`); return { sent: true, email: e.value, devCode: code }; }
+    store.dropCode(e.value);
+    throw new HttpError(503, 'MAIL_OFF', 'Email sign-in isn’t set up on this server yet.');
+  });
 
-    if (p === '/api/hub/auth/verify' && m === 'POST') {
-      if (!ipVerifyLimit(clientIp(req))) return fail(res, 429, 'RATE_LIMIT', 'Too many attempts from this network. Try again in 15 minutes.');
-      const body = await readJson(req);
-      const e = rules.email(body.email, cfg.domain);
-      if (e.error) return fail(res, 400, 'BAD_EMAIL', e.error);
-      const code = String(body.code || '').replace(/\D/g, '');
-      if (code.length !== 6) return fail(res, 400, 'BAD_CODE', 'Enter the 6-digit code from the email.');
-      const rec = store.getCode(e.value);
-      if (!rec || rec.exp < Date.now()) return fail(res, 400, 'EXPIRED', 'This code has expired. Ask for a new one.');
-      const ok = crypto.timingSafeEqual(Buffer.from(rec.hash, 'hex'), Buffer.from(hashCode(e.value, code), 'hex'));
-      if (!ok) {
-        rec.tries += 1;
-        if (rec.tries >= 5) { store.dropCode(e.value); return fail(res, 400, 'LOCKED', 'Too many wrong tries. Ask for a new code.'); }
-        store.setCode(e.value, rec);
-        return fail(res, 400, 'WRONG_CODE', `That code isn’t right. ${5 - rec.tries} ${5 - rec.tries === 1 ? 'try' : 'tries'} left.`);
-      }
-      store.dropCode(e.value);
-      const u = store.userByEmail(e.value) || store.createUser(e.value);
-      setSession(req, res, u);
-      return send(res, 200, { user: publicUser(u) });
+  r.post('/api/hub/auth/verify', null, async ({ req, res }) => {
+    if (!ipVerifyLimit(clientIp(req))) throw new HttpError(429, 'RATE_LIMIT', 'Too many attempts from this network. Try again in 15 minutes.');
+    const body = await readJson(req);
+    const e = rules.email(body.email, cfg.domain); if (e.error) throw new HttpError(400, 'BAD_EMAIL', e.error);
+    const code = String(body.code || '').replace(/\D/g, '');
+    if (code.length !== 6) throw new HttpError(400, 'BAD_CODE', 'Enter the 6-digit code from the email.');
+    const rec = store.getCode(e.value);
+    if (!rec || rec.exp < Date.now()) throw new HttpError(400, 'EXPIRED', 'This code has expired. Ask for a new one.');
+    const ok = crypto.timingSafeEqual(Buffer.from(rec.hash, 'hex'), Buffer.from(hashCode(e.value, code), 'hex'));
+    if (!ok) {
+      rec.tries += 1;
+      if (rec.tries >= 5) { store.dropCode(e.value); throw new HttpError(400, 'LOCKED', 'Too many wrong tries. Ask for a new code.'); }
+      store.setCode(e.value, rec);
+      throw new HttpError(400, 'WRONG_CODE', `That code isn’t right. ${5 - rec.tries} ${5 - rec.tries === 1 ? 'try' : 'tries'} left.`);
     }
+    store.dropCode(e.value);
+    const u = store.userByEmail(e.value) || store.createUser(e.value);
+    addCookie(res, cookie(req, 'hub_session', sign({ sub: u.id }, cfg.jwtSecret, { expiresInSec: 30 * 86400 }), 30 * 86400));
+    return { user: publicUser(u) };
+  });
 
-    if (p === '/api/hub/auth/logout' && m === 'POST') { clearSession(req, res); return send(res, 200, { ok: true }); }
-
-    const user = currentUser(req);
-    if (p.startsWith('/api/hub/') && !user) return fail(res, 401, 'SIGNED_OUT', 'Please sign in.');
-
-    if (p === '/api/hub/me' && m === 'GET') return send(res, 200, { user: publicUser(user) });
-
-    if (p === '/api/hub/me' && m === 'PUT') {
-      const body = await readJson(req);
-      const patch = {}; const errors = {};
-      for (const k of ['name', 'phone', 'regNo', 'gender']) {
-        if (body[k] === undefined) continue;
-        const r = rules[k](body[k]);
-        if (r.error) errors[k] = r.error; else patch[k] = r.value;
-      }
-      if (Object.keys(errors).length) return send(res, 400, { error: 'Check the highlighted fields.', code: 'INVALID', fields: errors });
-      return send(res, 200, { user: publicUser(store.updateUser(user.id, patch)) });
+  r.post('/api/hub/auth/logout', null, ({ req, res }) => { addCookie(res, cookie(req, 'hub_session', '', 0)); return { ok: true }; });
+  r.get('/api/hub/me', 'signedIn', ({ user }) => ({ user: publicUser(user) }));
+  r.put('/api/hub/me', 'signedIn', async ({ req, user }) => {
+    const body = await readJson(req); const patch = {}; const fields = {};
+    for (const k of ['name', 'phone', 'regNo', 'gender']) {
+      if (body[k] === undefined) continue;
+      const v = rules[k](body[k]); if (v.error) fields[k] = v.error; else patch[k] = v.value;
     }
+    if (Object.keys(fields).length) throw new HttpError(400, 'INVALID', 'Check the highlighted fields.', { fields });
+    return { user: publicUser(store.updateUser(user.id, patch)) };
+  });
+  r.del('/api/hub/me', 'signedIn', async ({ req, res, user }) => {
+    const body = await readJson(req);
+    if (String(body.confirm || '').trim().toUpperCase() !== 'DELETE') throw new HttpError(400, 'CONFIRM', 'Type DELETE to confirm.');
+    for (const [col, key] of [['pgProfiles', 'uid'], ['pgSaves', 'uid'], ['xeroxFiles', 'studentId']]) for (const d of store.list(col, (x) => x[key] === user.id)) store.remove(col, d.id);
+    for (const c of store.list('pgConnects', (x) => x.from === user.id || x.to === user.id)) store.remove('pgConnects', c.id);
+    store.deleteUser(user.id); addCookie(res, cookie(req, 'hub_session', '', 0));
+    return { ok: true };
+  });
+  // Everything the student ordered, newest first, for the profile drawer.
+  r.get('/api/hub/orders', 'student', ({ user }) => {
+    const f = store.list('foodOrders', (o) => o.studentId === user.id).map((o) => ({ source: 'food', id: o.id, title: o.canteenName, token: o.token, status: o.status, amount: o.total, at: o.createdAt, detail: o.items.map((i) => `${i.qty}× ${i.name}`).join(', ') }));
+    const x = store.list('xeroxOrders', (o) => o.studentId === user.id).map((o) => ({ source: 'xerox', id: o.id, title: o.shopName, token: o.token, status: o.status, amount: o.total, at: o.createdAt, detail: o.files.map((i) => i.name).join(', ') }));
+    return { orders: [...f, ...x].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 60) };
+  });
 
-    if (p === '/api/hub/me' && m === 'DELETE') {
-      const body = await readJson(req);
-      if (String(body.confirm || '').trim().toUpperCase() !== 'DELETE') return fail(res, 400, 'CONFIRM', 'Type DELETE to confirm.');
-      store.deleteUser(user.id); clearSession(req, res);
-      return send(res, 200, { ok: true });
+  // Live updates: GET /api/live?t=topic1,topic2 (each topic checked against who is asking)
+  r.get('/api/live', 'any', ({ req, res, url, user, staff }) => {
+    const topics = String(url.searchParams.get('t') || '').split(',').filter(Boolean).slice(0, 10);
+    const who = { user: user && complete(user) ? user : null, staff };
+    const ok = topics.filter((t) => modules.some((m) => m.topics(t, who)));
+    if (!ok.length) throw new HttpError(403, 'FORBIDDEN', 'Nothing to follow.');
+    live.open(req, res, ok);
+    return r.HANDLED;
+  });
+
+  async function handleApi(req, res, url) {
+    const found = r.match(req.method, url.pathname);
+    if (!found) return fail(res, 404, 'NOT_FOUND', 'Not found.');
+    if (found.notAllowed) return fail(res, 405, 'METHOD', 'Method not allowed.');
+    const { route, params } = found;
+    const user = sessions.student(req);
+    const staff = sessions.staff(req);
+    if (route.auth === 'signedIn' && !user) return fail(res, 401, 'SIGNED_OUT', 'Please sign in.');
+    if (route.auth === 'student') {
+      if (!user) return fail(res, 401, 'SIGNED_OUT', 'Please sign in.');
+      if (!complete(user)) return fail(res, 409, 'PROFILE', 'Finish your profile first.');
     }
-
-    const sso = p.match(/^\/api\/hub\/sso\/(travel|pg)$/);
-    if (sso && m === 'GET') {
-      const u = publicUser(user);
-      if (!u.complete) return fail(res, 409, 'PROFILE', 'Finish your profile first.');
-      if (sso[1] === 'travel') {
-        if (!cfg.travelSecret) return send(res, 200, { url: 'travel/index.html', linked: false, note: 'Travel opens as a guest until TRAVEL_JWT_SECRET is set on the hub.' });
-        const username = u.name.replace(/[^A-Za-z0-9_]/g, '').slice(0, 20).padEnd(3, '0');
-        const token = sign({ sub: u.id, username, name: u.name, email: u.email, gender: u.gender }, cfg.travelSecret, { expiresInSec: 30 * 86400 });
-        return send(res, 200, { url: `travel/index.html#token=${encodeURIComponent(token)}`, linked: true });
-      }
-      if (!cfg.pgSecret) return send(res, 200, { url: 'pg/index.html', linked: false, note: 'PG opens its own start page until UNIHUB_SSO_SECRET is set on the hub.' });
-      const token = sign({ sub: u.id, name: u.name, email: u.email, gender: u.gender, regNo: u.regNo }, cfg.pgSecret, { expiresInSec: 300 });
-      return send(res, 200, { url: `${cfg.pgUrl}/sso?token=${encodeURIComponent(token)}`, linked: true });
-    }
-
-    return fail(res, 404, 'NOT_FOUND', 'Not found.');
+    if (route.auth === 'staff' && !staff) return fail(res, 401, 'STAFF_SIGNED_OUT', 'Please sign in with your staff ID.');
+    if (route.auth === 'admin' && (!staff || staff.role !== 'admin')) return fail(res, staff ? 403 : 401, 'ADMIN_ONLY', 'Only an admin can do this.');
+    if (route.auth === 'any' && !user && !staff) return fail(res, 401, 'SIGNED_OUT', 'Please sign in.');
+    const out = await route.handler({ req, res, url, params, user, staff });
+    if (out === r.HANDLED) return;
+    return send(res, 200, out || { ok: true });
   }
 
   function serveStatic(req, res, url) {
     let rel;
     try { rel = decodeURIComponent(url.pathname); } catch { return send(res, 400, 'Bad path'); }
-    if (rel.includes('\0') || BLOCKED.some((r) => r.test(rel))) return send(res, 404, 'Not found');
-    const top = rel.split('/')[1] || '';
-    if (!PUBLIC_TOP.has(top)) return send(res, 404, 'Not found');
+    if (rel.includes('\0') || BLOCKED.some((re) => re.test(rel))) return send(res, 404, 'Not found');
+    if (!PUBLIC_TOP.has(rel.split('/')[1] || '')) return send(res, 404, 'Not found');
     let file = path.join(SITE_ROOT, rel);
     if (!file.startsWith(SITE_ROOT)) return send(res, 404, 'Not found');
     fs.stat(file, (err, st) => {
@@ -293,12 +276,9 @@ export function createApp(cfg = makeConfig(), deps = {}) {
       }
       fs.stat(file, (err2, st2) => {
         if (err2 || !st2.isFile()) return send(res, 404, 'Not found');
-        const ext = path.extname(file).toLowerCase();
-        const hashed = /\/assets\/.+-[A-Za-z0-9_-]{6,}\.(js|css|svg|png|woff2?)$/.test(rel);
         res.writeHead(200, {
-          'Content-Type': MIME[ext] || 'application/octet-stream',
-          'Content-Length': st2.size,
-          'Cache-Control': hashed ? 'public, max-age=31536000, immutable' : 'no-cache',
+          'Content-Type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream',
+          'Content-Length': st2.size, 'Cache-Control': 'no-cache',
           ...(rel === '/sw.js' ? { 'Service-Worker-Allowed': '/' } : {}),
         });
         if (req.method === 'HEAD') return res.end();
@@ -313,76 +293,26 @@ export function createApp(cfg = makeConfig(), deps = {}) {
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     const url = new URL(req.url, 'http://local');
     try {
-      if (url.pathname.startsWith('/api/hub/') || url.pathname === '/api/health') return await api(req, res, url);
-      // Every other /api call and /socket.io belongs to the Travel server; pass it through.
-      if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/socket.io/')) return proxyTravel(req, res);
-      const runtime = runtimeConfig(url.pathname);
-      if (runtime !== null) return send(res, 200, runtime, { 'Content-Type': 'text/javascript; charset=utf-8' });
+      if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
       if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Method not allowed');
       return serveStatic(req, res, url);
     } catch (err) {
-      if (err.status) return fail(res, err.status, 'BAD_REQUEST', err.message);
-      console.error(err);
+      if (res.headersSent) { res.end(); return; }
+      if (err instanceof HttpError || err.status) return fail(res, err.status, err.code || 'BAD_REQUEST', err.message, err.extra);
+      log(err.stack || String(err));
       return fail(res, 500, 'SERVER', 'Something went wrong on our side.');
     }
   });
-  // Xerox counts as connected when hub/.env or xerox/config.js names a Supabase project.
-  function xeroxFileConfigured() {
-    try { return /supabaseUrl:\s*'https:\/\//.test(fs.readFileSync(path.join(SITE_ROOT, 'xerox', 'config.js'), 'utf8')); } catch { return false; }
-  }
-
-  // Module settings that used to be edited by hand now come from hub/.env.
-  function runtimeConfig(pathname) {
-    if (pathname === '/xerox/config.js' || pathname === '/xerox/owner/config.js') {
-      if (!cfg.xeroxSupabaseUrl) return null; // fall back to the file in the repo
-      return `window.XEROX_CONFIG = ${JSON.stringify({ supabaseUrl: cfg.xeroxSupabaseUrl, supabaseAnonKey: cfg.xeroxSupabaseKey })};\n`;
-    }
-    if (pathname === '/travel/config.js') return 'window.TRAVEL_CONFIG = { API_URL: "" }; // UniHub forwards /api and /socket.io to the Travel server\n';
-    return null;
-  }
-
-  function proxyTravel(req, res) {
-    if (!cfg.travelApiUrl) return fail(res, 503, 'TRAVEL_OFF', 'Travel isn’t connected yet. Set TRAVEL_API_URL on the UniHub server.');
-    const target = new URL(cfg.travelApiUrl);
-    const lib = target.protocol === 'https:' ? https : http;
-    const headers = { ...req.headers, host: target.host, 'x-forwarded-for': clientIp(req), 'x-forwarded-proto': req.headers['x-forwarded-proto'] || 'http' };
-    delete headers.cookie; // UniHub's session cookie is not Travel's business
-    const up = lib.request({ protocol: target.protocol, hostname: target.hostname, port: target.port || (target.protocol === 'https:' ? 443 : 80), method: req.method, path: req.url, headers, timeout: 60000 }, (r) => {
-      res.writeHead(r.statusCode || 502, r.headers);
-      r.pipe(res);
-    });
-    up.on('timeout', () => up.destroy(new Error('timeout')));
-    up.on('error', () => { if (!res.headersSent) fail(res, 502, 'TRAVEL_DOWN', 'Travel is waking up or unreachable. Try again in a minute.'); else res.end(); });
-    req.pipe(up);
-  }
-
-  // Socket.IO websockets for Travel's live chat and group updates.
-  server.on('upgrade', (req, socket, head) => {
-    if (!cfg.travelApiUrl || !req.url.startsWith('/socket.io/')) { socket.destroy(); return; }
-    const target = new URL(cfg.travelApiUrl);
-    const secure = target.protocol === 'https:';
-    const port = Number(target.port) || (secure ? 443 : 80);
-    const upstream = secure ? tls.connect({ host: target.hostname, port, servername: target.hostname }) : net.connect({ host: target.hostname, port });
-    upstream.once(secure ? 'secureConnect' : 'connect', () => {
-      const lines = [`${req.method} ${req.url} HTTP/1.1`];
-      for (const [k, v] of Object.entries(req.headers)) if (k !== 'host' && k !== 'cookie') lines.push(`${k}: ${v}`);
-      lines.push(`host: ${target.host}`, '', '');
-      upstream.write(lines.join('\r\n'));
-      if (head && head.length) upstream.write(head);
-      upstream.pipe(socket); socket.pipe(upstream);
-    });
-    const close = () => { socket.destroy(); upstream.destroy(); };
-    upstream.on('error', close); socket.on('error', close);
-  });
-
   setInterval(() => store.pruneCodes(), 10 * 60e3).unref();
-  return { server, store, cfg };
+  return { server, store, cfg, live };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const { server, cfg } = createApp();
+  const { server, cfg, store } = createApp();
   server.listen(cfg.port, () => {
     console.log(`${cfg.appName} running at http://localhost:${cfg.port}`);
-    if (!cfg.smtpUrl) console.log(cfg.showDevCodes ? 'No SMTP_URL set: sign-in codes are printed here and shown on screen (dev mode).' : 'No SMTP_URL set: email sign-in is off.');
+    if (!cfg.smtpUrl) console.log(cfg.showDevCodes ? 'No SMTP_URL set: sign-in codes are printed here and shown on screen (test mode).' : 'No SMTP_URL set: email sign-in is off.');
   });
+  const stop = () => { store.flushNow(); process.exit(0); };
+  process.on('SIGINT', stop); process.on('SIGTERM', stop);
 }
