@@ -1,0 +1,3 @@
+{ "name": "@unihub/shared", "version": "0.1.0", "type": "module", "main": "src/index.js",
+  "dependencies": { "pdf-lib": "^1.17.1", "pdfjs-dist": "3.11.174" }, "peerDependencies": { "react": "^18.3.1" },
+  "scripts": { "test": "node --test test/shared.test.js test/pdfCut.test.js test/format.test.js" } }

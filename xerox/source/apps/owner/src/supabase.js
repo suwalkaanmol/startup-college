@@ -1,0 +1,8 @@
+// Owner client: a real Supabase Auth user, linked to exactly one shop via shop_owners (RLS enforces it).
+import { createClient } from '@supabase/supabase-js';
+const cfg = window.XEROX_CONFIG || {};
+// config.js (next to index.html) wins; the .env values are used while developing.
+export const SUPABASE_URL = cfg.supabaseUrl?.startsWith('https://') ? cfg.supabaseUrl : import.meta.env.VITE_SUPABASE_URL;
+export const SUPABASE_KEY = cfg.supabaseAnonKey || import.meta.env.VITE_SUPABASE_ANON_KEY;
+// The storage key is prefixed so it never collides with another module's login on the same site.
+export const supabase = createClient(SUPABASE_URL || 'http://localhost', SUPABASE_KEY || 'missing', { auth: { storageKey: 'xerox-owner-auth' } });

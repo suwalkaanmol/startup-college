@@ -1,0 +1,2 @@
+{ "name": "unihub-print", "private": true, "workspaces": ["apps/*", "packages/*"],
+  "scripts": { "build:xerox": "node scripts/build-xerox.mjs", "test": "npm test -w packages/shared && node scripts/contrast.mjs > /dev/null" } }
