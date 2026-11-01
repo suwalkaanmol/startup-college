@@ -1,0 +1,22 @@
+{
+  "name": "UniHub · VIT Vellore",
+  "short_name": "UniHub",
+  "description": "Print, eat, travel, find a PG and find your way around VIT Vellore with one sign-in.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3f6ff",
+  "theme_color": "#1d38a3",
+  "icons": [
+    { "src": "hub/web/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "hub/web/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "hub/web/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Xerox", "url": "xerox/index.html" },
+    { "name": "Food", "url": "food/index.html" },
+    { "name": "VIT Nav", "url": "nav/index.html" }
+  ]
+}

@@ -86,9 +86,9 @@ const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.webmanifest': 'application/manifest+json',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
-  '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.txt': 'text/plain; charset=utf-8',
+  '.ico': 'image/x-icon', '.map': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.txt': 'text/plain; charset=utf-8',
 };
-const PUBLIC_TOP = new Set(['', 'index.html', 'food', 'travel', 'xerox', 'pg', 'nav', 'hub']);
+const PUBLIC_TOP = new Set(['', 'index.html', 'sw.js', 'manifest.webmanifest', 'food', 'travel', 'xerox', 'pg', 'nav', 'hub']);
 const BLOCKED = [
   /(^|\/)\./, /node_modules/, /\.(md|bat|sql|env|lock|log)$/i, /(^|\/)package(-lock)?\.json$/i,
   /^\/hub\/(?!web\/)/, /^\/(travel|pg)\/server(\/|$)/, /^\/pg\/(client|scripts)(\/|$)/,
@@ -237,6 +237,13 @@ export function createApp(cfg = makeConfig(), deps = {}) {
       return send(res, 200, { user: publicUser(store.updateUser(user.id, patch)) });
     }
 
+    if (p === '/api/hub/me' && m === 'DELETE') {
+      const body = await readJson(req);
+      if (String(body.confirm || '').trim().toUpperCase() !== 'DELETE') return fail(res, 400, 'CONFIRM', 'Type DELETE to confirm.');
+      store.deleteUser(user.id); clearSession(req, res);
+      return send(res, 200, { ok: true });
+    }
+
     const sso = p.match(/^\/api\/hub\/sso\/(travel|pg)$/);
     if (sso && m === 'GET') {
       const u = publicUser(user);
@@ -276,6 +283,7 @@ export function createApp(cfg = makeConfig(), deps = {}) {
           'Content-Type': MIME[ext] || 'application/octet-stream',
           'Content-Length': st2.size,
           'Cache-Control': hashed ? 'public, max-age=31536000, immutable' : 'no-cache',
+          ...(rel === '/sw.js' ? { 'Service-Worker-Allowed': '/' } : {}),
         });
         if (req.method === 'HEAD') return res.end();
         fs.createReadStream(file).pipe(res);

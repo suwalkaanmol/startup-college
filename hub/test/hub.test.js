@@ -68,7 +68,17 @@ test('sign-in with an emailed code, then profile and hand-off tokens', async () 
   assert.equal((await call('/api/hub/me')).status, 401);
 });
 
+test('delete account needs DELETE typed, then signs out and removes the profile', async () => {
+  const r = await call('/api/hub/auth/request-code', 'POST', { email: 'leaving2024@vitstudent.ac.in' });
+  await call('/api/hub/auth/verify', 'POST', { email: 'leaving2024@vitstudent.ac.in', code: r.body.devCode });
+  assert.equal((await call('/api/hub/me', 'DELETE', { confirm: 'yes' })).status, 400);
+  assert.equal((await call('/api/hub/me', 'DELETE', { confirm: 'delete' })).status, 200);
+  assert.equal((await call('/api/hub/me')).status, 401);
+});
+
 test('private files are never served', async () => {
+  assert.equal((await fetch(base + '/sw.js')).status, 200);
+  assert.equal((await fetch(base + '/manifest.webmanifest')).status, 200);
   for (const p of ['/hub/server.js', '/hub/data/hub.json', '/.git/config', '/pg/server/src/config.js', '/xerox/source/README.md', '/hub/.env']) {
     assert.equal((await fetch(base + p)).status, 404, p);
   }

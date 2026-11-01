@@ -31,6 +31,7 @@ export function createStore(file) {
       const u = data.users[id]; if (!u) return null;
       Object.assign(u, patch, { updatedAt: new Date().toISOString() }); save(); return u;
     },
+    deleteUser(id) { const u = data.users[id]; if (!u) return false; delete data.users[id]; delete data.codes[u.email]; save(); return true; },
     getCode(email) { return data.codes[email] || null; },
     setCode(email, rec) { data.codes[email] = rec; save(); },
     dropCode(email) { delete data.codes[email]; save(); },

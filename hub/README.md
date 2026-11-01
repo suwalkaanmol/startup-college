@@ -9,7 +9,9 @@ This folder holds:
   - `web/theme.css`: the shared look (one blue family, several gradients, Sora + DM Sans). It maps each module's own colour variables onto the shared ones.
   - `web/sync.js`: applies the light/dark choice from the profile, and sends signed-out students back to sign in.
 - `lib/`: signed tokens (`jwt.js`), a small SMTP client (`mailer.js`) and a JSON-file store (`store.js`).
-- `test/`: `npm test` runs 5 tests (sign-in, profile, hand-off tokens, private files, SMTP).
+- `test/`: `npm test` runs 6 tests (sign-in, profile, hand-off tokens, account deletion, private files, SMTP).
+
+The root also has `manifest.webmanifest` and `sw.js`, so students can install UniHub on their phone. The service worker caches only the hub and VIT Nav; module pages and every `/api` call always go to the network.
 
 ## Run it
 
@@ -42,7 +44,7 @@ Copy `.env.example` to `.env` and fill in what you need.
 - **Xerox** and **Food** open directly. They keep their own servers (Supabase for Xerox, the UniHub canteen backend for Food).
 - **Travel**: the hub signs a token with `TRAVEL_JWT_SECRET` and opens `travel/index.html#token=...`. Travel's own code already reads that. Set `travel/config.js` `API_URL` to the Travel server.
 - **PG**: the hub signs a 5-minute token with `UNIHUB_SSO_SECRET` and opens `PG_URL/sso?token=...`, the hand-off PlaceMate already supports.
-- **VIT Nav**: `nav/index.html`, a static PRP level 6 plan. Editing comes later.
+- **VIT Nav**: `nav/index.html`, a PRP level 6 plan. `nav/index.html#room=614` opens on a room; the home screen's room search uses this. Editing comes later.
 
 Until the Travel and PG secrets are set, those tiles still open (Travel as a guest, PG on its start page) and the hub shows a note.
 

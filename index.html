@@ -7,6 +7,11 @@
   <meta name="description" content="UniHub: print, eat, travel, find a PG and find your way around VIT Vellore with one sign-in.">
   <meta name="theme-color" content="#1d38a3">
   <link rel="icon" href="hub/web/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="hub/web/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="UniHub">
   <script src="hub/web/sync.js"></script>
   <link rel="stylesheet" href="hub/web/theme.css">
   <link rel="stylesheet" href="hub/web/hub.css">
@@ -91,6 +96,13 @@
         <p class="eyebrow" id="today"></p>
         <h1 id="greeting">Hello</h1>
         <p class="muted" id="greet-sub">What do you need today?</p>
+        <form class="roomfind" id="roomfind" novalidate role="search">
+          <label for="room-q" class="sr">Find a room in PRP</label>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+          <input id="room-q" inputmode="text" autocomplete="off" maxlength="5" placeholder="Find a room in PRP, e.g. 623">
+          <button type="submit" class="btn primary">Show on map</button>
+        </form>
+        <p class="field-error" id="room-err" role="alert"></p>
       </div>
 
       <div class="activity" id="activity" hidden></div>
@@ -192,6 +204,16 @@
       </section>
 
       <button class="btn danger-ghost" id="signout">Sign out</button>
+      <details class="danger-zone">
+        <summary>Delete my account</summary>
+        <form id="delete-form" novalidate>
+          <p class="muted small">This removes your UniHub profile. Orders already placed stay with the canteen and print shops. To confirm, type DELETE.</p>
+          <label for="del-confirm" class="sr">Type DELETE to confirm</label>
+          <input id="del-confirm" autocomplete="off" placeholder="DELETE">
+          <p class="field-error" id="del-error" role="alert"></p>
+          <button class="btn danger-solid" type="submit">Delete account</button>
+        </form>
+      </details>
     </div>
   </aside>
 

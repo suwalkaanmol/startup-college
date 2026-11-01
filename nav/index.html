@@ -64,7 +64,11 @@ svg text{font-family:var(--f-mono)}
 .bname{fill:var(--line);font-family:var(--f-display)!important;font-size:17px;font-weight:600;letter-spacing:.06em;text-anchor:middle;pointer-events:none}
 .bsub{fill:var(--line);opacity:.65;font-size:9.5px;text-anchor:middle;pointer-events:none}
 .fx{cursor:pointer}
-.editing .tile,.editing .blk{pointer-events:none}
+.editing.mode-markers .tile,.editing.mode-markers .blk,.editing.mode-rooms .fx,.editing.mode-rooms .blk,.editing.mode-outlines .tile,.editing.mode-outlines .fx{pointer-events:none}
+.editing.mode-rooms .tile{cursor:grab}
+.vh{fill:var(--paper-deep);stroke:var(--line);stroke-width:1.5;cursor:grab}.vh.on{stroke:var(--select);stroke-width:2.5}
+.tile.esel rect{stroke:var(--select);stroke-width:2}
+[hidden]{display:none!important}
 .editing .fx{cursor:grab}
 .editing{cursor:crosshair}
 .fx.sel>rect:first-child{stroke:var(--select);stroke-width:2.5}
@@ -116,21 +120,35 @@ svg text{font-family:var(--f-mono)}
         <p class="hint" style="margin:0">Room, lift and staircase editing comes in the next CampusNavi update. Positions here are a draft from the team’s sketches.</p>
       </div>
       <div class="panel" id="editPanel" hidden>
-        <h2>Lifts, stairs and washrooms</h2>
-        <button type="button" class="toggle" id="editToggle" aria-pressed="false">Edit positions</button>
+        <h2>Edit the plan</h2>
+        <button type="button" class="toggle" id="editToggle" aria-pressed="false">Edit the plan</button>
         <div id="editBody" hidden>
-          <div class="tools" id="tools" role="group" aria-label="What to place">
-            <button type="button" data-tool="move" aria-pressed="true">Move</button>
-            <button type="button" data-tool="lift" aria-pressed="false">Lift</button>
-            <button type="button" data-tool="stairs" aria-pressed="false">Staircase</button>
-            <button type="button" data-tool="wcF" aria-pressed="false">Washroom F</button>
-            <button type="button" data-tool="wcM" aria-pressed="false">Washroom M</button>
-            <button type="button" data-tool="wc" aria-pressed="false">Washroom</button>
-            <button type="button" data-tool="water" aria-pressed="false">Water cooler</button>
-            <button type="button" data-tool="sit" aria-pressed="false">Sitting area</button>
+          <div class="tools" id="modes" role="group" aria-label="What to edit">
+            <button type="button" data-mode="markers" aria-pressed="true">Lifts &amp; more</button>
+            <button type="button" data-mode="rooms" aria-pressed="false">Rooms</button>
+            <button type="button" data-mode="outlines" aria-pressed="false">Outlines</button>
           </div>
-          <div class="hint" id="hint">Drag any marker to its real spot. Pick a type above, then tap the plan to add one.</div>
-          <div class="selbox" id="selBox" hidden>
+          <div id="pMarkers">
+            <div class="tools" id="tools" role="group" aria-label="What to place">
+              <button type="button" data-tool="move" aria-pressed="true">Move</button>
+              <button type="button" data-tool="lift" aria-pressed="false">Lift</button>
+              <button type="button" data-tool="stairs" aria-pressed="false">Staircase</button>
+              <button type="button" data-tool="wcF" aria-pressed="false">Washroom F</button>
+              <button type="button" data-tool="wcM" aria-pressed="false">Washroom M</button>
+              <button type="button" data-tool="wc" aria-pressed="false">Washroom</button>
+              <button type="button" data-tool="water" aria-pressed="false">Water cooler</button>
+              <button type="button" data-tool="sit" aria-pressed="false">Sitting area</button>
+            </div>
+          </div>
+          <div id="pRooms" hidden class="selbox">
+            <form id="addRoomForm" novalidate>
+              <label for="newRoom">Add a room the plan is missing</label>
+              <div class="row"><input id="newRoom" inputmode="text" maxlength="4" placeholder="e.g. 645" style="flex:1;min-width:0"><button type="submit">Add</button></div>
+              <p class="err" id="addErr" role="alert"></p>
+            </form>
+          </div>
+          <div class="hint" id="hint">Drag a marker to its real spot. Pick a type, then tap the plan to add one.</div>
+          <div class="selbox" id="selFx" hidden>
             <label for="fxKind">Selected marker</label>
             <select id="fxKind">
               <option value="lift">Lift</option><option value="lift246">Lift (floors 2, 4, 6)</option><option value="stairs">Staircase</option>
@@ -140,9 +158,21 @@ svg text{font-family:var(--f-mono)}
             <label for="fxNote">Note (optional)</label>
             <input id="fxNote" maxlength="80" placeholder="e.g. charcoal granite doors, faces 642">
             <div class="row"><button type="button" class="danger" id="fxDel">Remove marker</button></div>
-            <div class="hint">Arrow keys nudge the selected marker; hold Shift for bigger steps.</div>
           </div>
-          <div class="row" style="margin-top:12px"><button type="button" class="ghost" id="copyBtn">Copy positions as text</button></div>
+          <div class="selbox" id="selRoom" hidden>
+            <div><span class="room-no" style="font-size:30px" id="rmId"></span><div class="hint" id="rmWhere" style="margin-top:4px"></div></div>
+            <label for="rmName">Room name (optional)</label>
+            <input id="rmName" maxlength="60" placeholder="e.g. Computing Lab">
+            <label for="rmLabel">Label shown on the plan (optional)</label>
+            <input id="rmLabel" maxlength="8" placeholder="Leave empty to show the number">
+            <div class="row"><button type="button" class="ghost" id="rmTray">Move to tray</button><button type="button" class="ghost" id="rmReset">Back to sketch spot</button><button type="button" class="danger" id="rmDel">Remove room</button></div>
+          </div>
+          <div class="selbox" id="selBlock" hidden>
+            <div><strong id="bkName"></strong><div class="hint" style="margin-top:4px">Drag its round corner handles to reshape it.</div></div>
+            <div class="row"><button type="button" class="ghost" id="bkReset">Reset outline to the map</button></div>
+          </div>
+          <div class="hint" style="margin-top:12px">Arrow keys nudge the selected marker or room; hold Shift for bigger steps.</div>
+          <div class="row" style="margin-top:12px"><button type="button" class="ghost" id="copyBtn">Copy the whole plan as text</button></div>
         </div>
         <div class="status" id="saveStatus" aria-live="polite"></div>
       </div>
@@ -166,7 +196,7 @@ svg text{font-family:var(--f-mono)}
     <h2>What still needs a site check</h2>
     <ol>
       <li>Room order inside A, B, D, E and each C section follows the eight hand sketches. Spacing between doors is drawn evenly.</li>
-      <li>Rooms that no sketch shows sit in the "Not placed yet" tray at top left: 601–603, 627, 628, 636, 638, 640, 645, 646, 649, 658–661 and 677.</li>
+      <li>Rooms that no sketch shows sit in the "Not placed yet" tray at top right: 601–603, 627, 628, 636, 638, 640, 645, 646, 649, 658–661 and 677.</li>
       <li>Which C shape holds which rooms follows your note: 605–609 in the hexagon beside A, 615–620 in the hexagon beside E, 601–604 and 621–625 in the two inner hexagons. Dashed outlines mark these until confirmed.</li>
       <li>C-Mid (610–614) is drawn as the rear pentagon that B and D both open onto, with the clock rotunda in front of it. This replaces the briefing's 610–618 and 619–625 ranges.</li>
       <li>E is laid out as a mirror image of A: lift and stair cores on the courtyard side, the 629–635 run on the outer side, and two inner courts.</li>
@@ -309,14 +339,6 @@ el('polygon',{points:G.SHELTER.join(' '),fill:'none',stroke:'var(--line-dim)'});
 
 /* Corridors: straight hallways for B and D, a walkway to the clock, wall-to-wall joins elsewhere */
 const links=el('g',{});
-function nearest(pa,pb){let best=[1e9];const samp=p=>p.flatMap((a,i)=>{const b=p[(i+1)%p.length];return Array.from({length:24},(_,t)=>[a[0]+(b[0]-a[0])*t/24,a[1]+(b[1]-a[1])*t/24])});
-  const A=samp(pa),B=samp(pb);for(const a of A)for(const b of B){const d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(d<best[0])best=[d,a,b]}return[best[1],best[2]]}
-function band(pts,w){const p=pts.map(q=>q.map(v=>Math.round(v)).join(',')).join(' ');
-  el('polyline',{points:p,fill:'none',stroke:'var(--line)','stroke-width':w,opacity:.16,'stroke-linecap':'butt'},links);
-  el('polyline',{points:p,fill:'none',stroke:'var(--line)','stroke-width':1,opacity:.6,'stroke-dasharray':'4 4'},links)}
-[['A','CNE'],['CNE','CNW'],['CNW','CMID'],['E','CSW'],['CSW','CW'],['CW','CMID'],['CLK','CMID']].forEach(([a,b])=>{const [p,q]=nearest(G[a],G[b]);const d=Math.hypot(q[0]-p[0],q[1]-p[1])||1,ext=6;band([[p[0]-(q[0]-p[0])/d*ext,p[1]-(q[1]-p[1])/d*ext],[q[0]+(q[0]-p[0])/d*ext,q[1]+(q[1]-p[1])/d*ext]],16)});
-[bW.door,dW.door].forEach(dp=>{const [,q]=nearest([dp,dp],G.CMID);const d=Math.hypot(q[0]-dp[0],q[1]-dp[1])||1;band([dp,[q[0]+(q[0]-dp[0])/d*6,q[1]+(q[1]-dp[1])/d*6]],22)});
-el('polygon',{points:G.WALK.join(' '),fill:'rgba(219,233,247,.16)',stroke:'var(--line-dim)'},links);
 
 /* Stage 1 walk */
 const clkGate=[(G.WALK[2][0]+G.WALK[3][0])/2,(G.WALK[2][1]+G.WALK[3][1])/2],walkTop=[(G.WALK[0][0]+G.WALK[1][0])/2,(G.WALK[0][1]+G.WALK[1][1])/2];
@@ -328,173 +350,297 @@ el('text',{x:board[0]+12,y:board[1]-10,fill:'var(--select)','font-size':11.5,'fo
 [[P([612,232]),'Ganga Xerox'],[P([505,598]),'Shanti Stationery']].forEach(([[x,y],t])=>{el('circle',{cx:x,cy:y,r:4,fill:'none',stroke:'var(--line)'});el('text',{x:x+8,y:y+4,fill:'var(--line)',opacity:.75,'font-size':10}).textContent=t});
 el('text',{x:cm[0],y:G.CMID.reduce((m,p)=>Math.min(m,p[1]),1e9)-10,fill:'var(--line)',opacity:.75,'font-size':10.5,'text-anchor':'middle','letter-spacing':'1.5'}).textContent='▼ MAIN ENTRANCE (rear)';
 
-const tileEls={},blockEls={},byRoom={};
+/* ===== Everything below draws from current state, so edits re-render the plan ===== */
+const blocksLayer=el('g',{}),tilesLayer=el('g',{}),trayLayer=el('g',{}),fixLayer=el('g',{}),handleLayer=el('g',{});
 const KIND={L:'lift','2·4·6':'lift246','≡':'stairs',WC:'wc',WCF:'wcF',WCM:'wcM',S:'sit',W:'water'};
 const LOOK={lift:['L','var(--lift)',1],lift246:['2·4·6','var(--lift)',1],stairs:['≡','var(--lift)',0],wc:['WC','var(--line)',0],wcF:['WC·F','var(--line)',0],wcM:['WC·M','var(--line)',0],water:['W','#7cc7ff',0],sit:['S','var(--green)',0]};
 const NAME={lift:'Lift',lift246:'Lift (2, 4, 6)',stairs:'Staircase',wc:'Washroom',wcF:'Washroom F',wcM:'Washroom M',water:'Water cooler',sit:'Sitting area'};
-const baseFix=[];
-function tile(n,x,y,label,g){
-  const txt=label||String(n),w=Math.max(30,txt.length*7+6);
-  const t=el('g',{class:'tile'+(roomNotes[n]?' mark':''),transform:`translate(${x.toFixed(1)},${y.toFixed(1)})`,tabindex:0,role:'button','aria-label':'Room '+n},g);
-  el('rect',{x:-w/2,y:-8,width:w,height:16,rx:1.5},t);el('text',{},t).textContent=txt;
-  t.addEventListener('click',()=>select(n));
-  t.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();select(n)}});
-  tileEls[n]=t;
-}
+const byId={};blocks.forEach(b=>byId[b.id]=b);
+
+/* Base data from the sketches; saved edits are layered on top */
+const BASE_PTS={};blocks.forEach(b=>BASE_PTS[b.id]=b.pts.map(p=>[...p]));
+const baseRooms={},baseFix=[];
 blocks.forEach(b=>{
-  b.rooms.forEach(r=>byRoom[r]=b);
-  const g=el('g',{});
-  const poly=el('polygon',{points:b.pts.join(' '),class:'blk'+(b.ok?'':' guess'),tabindex:0,role:'button','aria-label':b.name},g);
-  poly.addEventListener('click',()=>showBlock(b));
-  poly.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();showBlock(b)}});
-  blockEls[b.id]=poly;
-  (b.extra||[]).forEach(x=>{
-    if(x.rect)el('polygon',{points:x.rect.join(' '),fill:'none',stroke:'var(--line-dim)','pointer-events':'none'},g);
-    if(x.line)el('line',{x1:x.line[0][0],y1:x.line[0][1],x2:x.line[1][0],y2:x.line[1][1],stroke:'var(--line-dim)','stroke-dasharray':'2 4','pointer-events':'none'},g);
-    if(x.door){el('circle',{cx:x.door[0],cy:x.door[1],r:5,fill:'var(--select)','pointer-events':'none'},g)}
-  });
-  if(b.pillars){ngon(b.pillars[0],b.pillars[1],b.pillars[2],5,-90).forEach(([x,y])=>el('circle',{cx:x,cy:y,r:3.5,fill:'none',stroke:'var(--line)','pointer-events':'none'},g))}
-  const c=b.nameAt||centroid(b.pts);
-  const ny=b.nameAt?c[1]:c[1]+(b.id==='CNE'||b.id==='CNW'||b.id==='CW'||b.id==='CLK'?-4:b.id==='CMID'?-2:4);
-  el('text',{x:c[0],y:ny,class:'bname'},g).textContent=b.name;
-  if(b.sub)el('text',{x:c[0],y:ny+13,class:'bsub'},g).textContent=b.sub;
-  (b.place||[]).forEach(([n,x,y,label])=>tile(n,x,y,label,g));
-  (b.fix||[]).forEach(([k,x,y],i)=>baseFix.push({id:b.id+'-'+i,kind:KIND[k],x,y}));
+  (b.place||[]).forEach(([n,x,y,label])=>baseRooms[n]={id:String(n),x,y,label:label||'',home:b.id,tray:false});
+  b.rooms.forEach(n=>{if(!baseRooms[n])baseRooms[n]={id:String(n),x:0,y:0,label:'',home:b.id,tray:true}});
+  (b.fix||[]).forEach(([k,x,y],i)=>baseFix.push({id:b.id+'-'+i,kind:KIND[k],x,y,note:''}));
 });
+let ov={fixtures:{},rooms:{},shapes:{}};
+let trayBottom=200,editing=false,mode='markers',tool='move',sel=null,drag=null,db=null,canSave=false,viewRoom='623';
+const tileEls={},blockEls={},fxEls={};let byRoom={};
 
-const tray=el('g',{});
-el('rect',{x:812,y:24,width:176,height:122,fill:'none',stroke:'var(--guess)','stroke-dasharray':'5 4'},tray);
-el('text',{x:822,y:42,fill:'var(--guess)','font-size':10.5,'letter-spacing':'1'},tray).textContent='NOT PLACED YET';
-unplaced.forEach((n,i)=>tile(n,838+(i%4)*42,62+Math.floor(i/4)*22,null,tray));
-
-const fixLayer=el('g',{});
-let overrides={},editing=false,tool='move',selId=null,drag=null,db=null,canSave=false;
-const fxEls={};
+const flat=a=>a.flatMap(p=>[Math.round(p[0]),Math.round(p[1])]);
+const pairs=f=>{const o=[];for(let i=0;i+1<f.length;i+=2)o.push([f[i],f[i+1]]);return o};
+function shapeOf(id){const s=ov.shapes[id];return s&&Array.isArray(s.pts)&&s.pts.length>=6?pairs(s.pts):BASE_PTS[id]}
 function pip(x,y,p){let c=false;for(let i=0,j=p.length-1;i<p.length;j=i++){const [xi,yi]=p[i],[xj,yj]=p[j];if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi))c=!c}return c}
 function blockAt(x,y){const b=blocks.find(b=>pip(x,y,b.pts));return b?b.id:'outside'}
-function current(){
+function roomsNow(){
+  const m={};for(const k in baseRooms)m[k]={...baseRooms[k]};
+  for(const id in ov.rooms){const o=ov.rooms[id];m[id]={...(m[id]||{id,home:o.block||'outside',label:'',tray:true,x:0,y:0}),...o,id}}
+  const list=Object.values(m).filter(r=>!r.deleted);
+  const tray=list.filter(r=>r.tray).sort((a,b)=>String(a.id).localeCompare(String(b.id),undefined,{numeric:true}));
+  tray.forEach((r,i)=>{r.x=838+(i%4)*42;r.y=62+Math.floor(i/4)*22});
+  return list;
+}
+function fixNow(){
   const m={};baseFix.forEach(f=>m[f.id]={...f});
-  for(const id in overrides){const o=overrides[id];m[id]={...(m[id]||{}),...o,id}}
+  for(const id in ov.fixtures){m[id]={...(m[id]||{}),...ov.fixtures[id],id}}
   return Object.values(m).filter(f=>!f.deleted&&f.kind&&LOOK[f.kind]);
 }
-function drawFix(f){
-  const [lab,c,solid]=LOOK[f.kind],w=lab.length>3?40:lab.length>2?34:lab.length>1?24:16;
-  const g=el('g',{class:'fx'+(f.id===selId?' sel':''),transform:`translate(${f.x},${f.y})`,tabindex:editing?0:-1,role:editing?'button':'img','aria-label':NAME[f.kind]+(f.note?': '+f.note:'')},fixLayer);
-  el('rect',{x:-w/2,y:-8,width:w,height:16,fill:solid?c:'var(--paper-deep)',stroke:c},g);
-  el('text',{x:0,y:4,fill:solid?'var(--paper-deep)':c,'font-size':f.kind==='stairs'?12:(w>30?9:10),'font-weight':solid?500:400,'text-anchor':'middle','pointer-events':'none'},g).textContent=lab;
-  if(f.note){const t=el('title',{},g);t.textContent=NAME[f.kind]+': '+f.note}
-  g.dataset.id=f.id;fxEls[f.id]=g;
-  g.addEventListener('keydown',e=>onFxKey(e,f.id));
-  g.addEventListener('focus',()=>{if(editing&&selId!==f.id)selectFx(f.id)});
+const roomName=r=>r.name||roomNotes[r.id]||'';
+const roomBlock=r=>{if(r.tray)return byId[r.home]||null;const at=blockAt(r.x,r.y);return byId[at]||byId[r.home]||null};
+
+/* Corridor links follow the current outlines */
+function nearest(pa,pb){let best=[1e9];const samp=p=>p.flatMap((a,i)=>{const b=p[(i+1)%p.length];return Array.from({length:24},(_,t)=>[a[0]+(b[0]-a[0])*t/24,a[1]+(b[1]-a[1])*t/24])});
+  const A=samp(pa),B=samp(pb);for(const a of A)for(const b of B){const d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(d<best[0])best=[d,a,b]}return[best[1],best[2]]}
+function band(pts,w){const p=pts.map(q=>q.map(v=>Math.round(v)).join(',')).join(' ');
+  el('polyline',{points:p,fill:'none',stroke:'var(--line)','stroke-width':w,opacity:.16,'stroke-linecap':'butt'},links);
+  el('polyline',{points:p,fill:'none',stroke:'var(--line)','stroke-width':1,opacity:.6,'stroke-dasharray':'4 4'},links)}
+function drawLinks(){
+  links.textContent='';
+  [['A','CNE'],['CNE','CNW'],['CNW','CMID'],['E','CSW'],['CSW','CW'],['CW','CMID'],['CLK','CMID']].forEach(([a,b])=>{const [p,q]=nearest(G[a],G[b]);const d=Math.hypot(q[0]-p[0],q[1]-p[1])||1,ext=6;band([[p[0]-(q[0]-p[0])/d*ext,p[1]-(q[1]-p[1])/d*ext],[q[0]+(q[0]-p[0])/d*ext,q[1]+(q[1]-p[1])/d*ext]],16)});
+  ['B','D'].forEach(k=>{const dp=wingFrame(k).door;const [,q]=nearest([dp,dp],G.CMID);const d=Math.hypot(q[0]-dp[0],q[1]-dp[1])||1;band([dp,[q[0]+(q[0]-dp[0])/d*6,q[1]+(q[1]-dp[1])/d*6]],22)});
+  el('polygon',{points:G.WALK.join(' '),fill:'rgba(219,233,247,.16)',stroke:'var(--line-dim)'},links);
 }
-function renderFix(){fixLayer.textContent='';for(const k in fxEls)delete fxEls[k];current().forEach(drawFix)}
-const status=document.getElementById('saveStatus');
-function say(t){status.textContent=t}
-const queue={};
-function save(id){
-  const f=current().find(f=>f.id===id)||{id,...overrides[id]};
-  const body={kind:f.kind,x:Math.round(f.x),y:Math.round(f.y),block:blockAt(f.x,f.y),note:f.note||'',deleted:!!f.deleted,updatedAt:new Date().toISOString()};
-  overrides[id]={...body};
-  if(!db||!canSave){say('Not saved: changes stay on this screen until the page is opened in Claude.');return}
-  say('Saving…');
-  queue[id]=(queue[id]||Promise.resolve()).then(()=>db.collection('fixtures').doc(id).set(body)).then(()=>say('Saved'),e=>{
-    if(e&&e.code==='invalid_argument'){canSave=false;say('You can view these positions but not change them.')}
-    else if(e&&e.code==='quota_exceeded')say('Storage is full, so this change was not saved.');
-    else say('Could not save just now. Your change is still on screen; try moving it again.');
+
+function tile(r,g){
+  const txt=r.label||r.id,w=Math.max(30,txt.length*7+6);
+  const t=el('g',{class:'tile'+(roomName(r)?' mark':'')+(sel&&sel.type==='room'&&sel.id===r.id?' esel':'')+(viewRoom===r.id?' sel':''),transform:`translate(${(+r.x).toFixed(1)},${(+r.y).toFixed(1)})`,tabindex:0,role:'button','aria-label':'Room '+r.id+(roomName(r)?', '+roomName(r):'')},g);
+  el('rect',{x:-w/2,y:-8,width:w,height:16,rx:1.5},t);el('text',{},t).textContent=txt;
+  t.dataset.id=r.id;tileEls[r.id]=t;
+}
+function render(){
+  blocks.forEach(b=>{b.pts=shapeOf(b.id);G[b.id]=b.pts});
+  drawLinks();
+  blocksLayer.textContent='';tilesLayer.textContent='';trayLayer.textContent='';handleLayer.textContent='';
+  for(const k in tileEls)delete tileEls[k];for(const k in blockEls)delete blockEls[k];
+  blocks.forEach(b=>{
+    const g=el('g',{},blocksLayer);
+    const poly=el('polygon',{points:b.pts.join(' '),class:'blk'+(b.ok?'':' guess')+(sel&&sel.type==='block'&&sel.id===b.id?' on':''),tabindex:0,role:'button','aria-label':b.name},g);
+    poly.dataset.id=b.id;blockEls[b.id]=poly;
+    (b.extra||[]).forEach(x=>{if(x.rect)el('polygon',{points:x.rect.join(' '),fill:'none',stroke:'var(--line-dim)','pointer-events':'none'},g)});
+    if(b.id==='B'||b.id==='D'){const dp=wingFrame(b.id).door;el('circle',{cx:dp[0],cy:dp[1],r:5,fill:'var(--select)','pointer-events':'none'},g)}
+    if(b.pillars){ngon(b.pillars[0],b.pillars[1],b.pillars[2],5,-90).forEach(([x,y])=>el('circle',{cx:x,cy:y,r:3.5,fill:'none',stroke:'var(--line)','pointer-events':'none'},g))}
+    const c=b.nameAt||centroid(b.pts);
+    const ny=b.nameAt?c[1]:c[1]+(b.id==='CNE'||b.id==='CNW'||b.id==='CW'||b.id==='CLK'?-4:b.id==='CMID'?-2:4);
+    el('text',{x:c[0],y:ny,class:'bname'},g).textContent=b.name;
+    if(b.sub)el('text',{x:c[0],y:ny+13,class:'bsub'},g).textContent=b.sub;
+    if(editing&&mode==='outlines')b.pts.forEach((p,i)=>{const h=el('circle',{cx:p[0],cy:p[1],r:7,class:'vh'+(sel&&sel.type==='block'&&sel.id===b.id?' on':''),tabindex:0,role:'button','aria-label':`${b.name} corner ${i+1}`},handleLayer);h.dataset.block=b.id;h.dataset.i=i});
+  });
+  const rooms=roomsNow();byRoom={};
+  rooms.forEach(r=>{byRoom[r.id]=r});
+  const trayRooms=rooms.filter(r=>r.tray),rows=Math.max(1,Math.ceil(trayRooms.length/4));
+  trayBottom=24+30+rows*22;el('rect',{x:812,y:24,width:176,height:30+rows*22,fill:'none',stroke:'var(--guess)','stroke-dasharray':'5 4'},trayLayer);
+  el('text',{x:822,y:42,fill:'var(--guess)','font-size':10.5,'letter-spacing':'1'},trayLayer).textContent=trayRooms.length?'NOT PLACED YET':'ALL ROOMS PLACED';
+  rooms.forEach(r=>tile(r,r.tray?trayLayer:tilesLayer));
+  renderFix();
+}
+function renderFix(){
+  fixLayer.textContent='';for(const k in fxEls)delete fxEls[k];
+  fixNow().forEach(f=>{
+    const [lab,c,solid]=LOOK[f.kind],w=lab.length>3?40:lab.length>2?34:lab.length>1?24:16;
+    const g=el('g',{class:'fx'+(sel&&sel.type==='fx'&&sel.id===f.id?' sel':''),transform:`translate(${f.x},${f.y})`,tabindex:editing&&mode==='markers'?0:-1,role:'img','aria-label':NAME[f.kind]+(f.note?': '+f.note:'')},fixLayer);
+    el('rect',{x:-w/2,y:-8,width:w,height:16,fill:solid?c:'var(--paper-deep)',stroke:c},g);
+    el('text',{x:0,y:4,fill:solid?'var(--paper-deep)':c,'font-size':f.kind==='stairs'?12:(w>30?9:10),'font-weight':solid?500:400,'text-anchor':'middle','pointer-events':'none'},g).textContent=lab;
+    if(f.note){el('title',{},g).textContent=NAME[f.kind]+': '+f.note}
+    g.dataset.id=f.id;fxEls[f.id]=g;
   });
 }
-const timers={};
-function saveSoon(id){clearTimeout(timers[id]);timers[id]=setTimeout(()=>save(id),450)}
-const toPt=e=>{const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(svg.getScreenCTM().inverse());return[Math.round(q.x),Math.round(q.y)]};
-const selBox=document.getElementById('selBox'),fxKind=document.getElementById('fxKind'),fxNote=document.getElementById('fxNote');
-function selectFx(id){
-  selId=id;Object.values(fxEls).forEach(g=>g.classList.toggle('sel',g.dataset.id===id));
-  const f=current().find(f=>f.id===id);selBox.hidden=!f;
-  if(f){fxKind.value=f.kind;fxNote.value=f.note||''}
+
+/* ===== Saving ===== */
+const status=document.getElementById('saveStatus');
+const say=t=>{status.textContent=t};
+const queue={},timers={};
+function persist(coll,id,body){
+  ov[coll][id]=body;
+  if(!db||!canSave){say('Not saved: changes stay on this screen until the page is opened in Claude.');return}
+  say('Saving…');
+  const key=coll+'/'+id;
+  queue[key]=(queue[key]||Promise.resolve()).then(()=>body===null?db.collection(coll).doc(id).delete():db.collection(coll).doc(id).set(body)).then(()=>say('Saved'),e=>{
+    if(e&&e.code==='invalid_argument'){canSave=false;say('You can view this plan but not change it.')}
+    else if(e&&e.code==='quota_exceeded')say('Storage is full, so this change was not saved.');
+    else say('Could not save just now. Your change is still on screen; try again.');
+  });
 }
-function setFx(id,patch){overrides[id]={...(overrides[id]||{}),...(current().find(f=>f.id===id)||{}),...patch};}
+function forget(coll,id){delete ov[coll][id];persist(coll,id,null);delete ov[coll][id]}
+const stamp=()=>new Date().toISOString();
+function saveFix(id){const f=fixNow().find(f=>f.id===id)||{id,...ov.fixtures[id]};persist('fixtures',id,{kind:f.kind,x:Math.round(f.x),y:Math.round(f.y),block:blockAt(f.x,f.y),note:f.note||'',deleted:!!f.deleted,updatedAt:stamp()})}
+function saveRoom(id){const r=roomsNow().find(r=>r.id===id)||{...ov.rooms[id],id};
+  persist('rooms',id,{x:Math.round(r.x),y:Math.round(r.y),tray:!!r.tray,label:r.label||'',name:r.name||'',block:r.tray?r.home:blockAt(r.x,r.y),home:r.home||'outside',deleted:!!r.deleted,added:!baseRooms[id],updatedAt:stamp()})}
+function saveShape(id){persist('shapes',id,{pts:flat(byId[id].pts),updatedAt:stamp()})}
+function saveSoon(fn,id){clearTimeout(timers[id]);timers[id]=setTimeout(()=>fn(id),450)}
+const setFix=(id,p)=>{ov.fixtures[id]={...(fixNow().find(f=>f.id===id)||ov.fixtures[id]||{}),...p}};
+const setRoom=(id,p)=>{const r=roomsNow().find(r=>r.id===id)||ov.rooms[id]||{};ov.rooms[id]={x:r.x,y:r.y,tray:r.tray,label:r.label,name:r.name,home:r.home,deleted:r.deleted,...p}};
+const setShape=(id,pts)=>{ov.shapes[id]={pts:flat(pts)}};
+
+/* ===== Edit interactions ===== */
+const toPt=e=>{const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(svg.getScreenCTM().inverse());return[Math.round(q.x),Math.round(q.y)]};
+const $=id=>document.getElementById(id);
+function select(type,id){sel=type?{type,id}:null;showSel();render()}
+function showSel(){
+  $('selFx').hidden=!(sel&&sel.type==='fx');$('selRoom').hidden=!(sel&&sel.type==='room');$('selBlock').hidden=!(sel&&sel.type==='block');
+  if(sel&&sel.type==='fx'){const f=fixNow().find(f=>f.id===sel.id);if(!f){sel=null;return showSel()}$('fxKind').value=f.kind;$('fxNote').value=f.note||''}
+  if(sel&&sel.type==='room'){const r=roomsNow().find(r=>r.id===sel.id);if(!r){sel=null;return showSel()}
+    $('rmId').textContent=r.id;$('rmLabel').value=r.label||'';$('rmName').value=roomName(r);
+    $('rmWhere').textContent=r.tray?'In the “not placed” tray. Drag it onto the plan.':'In '+((roomBlock(r)||{}).name||'no block yet');
+    $('rmTray').hidden=!!r.tray;$('rmReset').hidden=!(ov.rooms[r.id]&&baseRooms[r.id])}
+  if(sel&&sel.type==='block'){$('bkName').textContent=byId[sel.id].name;$('bkReset').hidden=!ov.shapes[sel.id]}
+}
+let raf=0;const later=fn=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(fn)};
 svg.addEventListener('pointerdown',e=>{
   if(!editing)return;
-  const g=e.target.closest&&e.target.closest('.fx');
-  if(g){const id=g.dataset.id,f=current().find(f=>f.id===id);const [x,y]=toPt(e);
-    drag={id,dx:f.x-x,dy:f.y-y,moved:false};selectFx(id);svg.setPointerCapture(e.pointerId);e.preventDefault();return}
-  if(tool!=='move'){const [x,y]=toPt(e);const id='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
-    setFx(id,{kind:tool,x,y,note:''});renderFix();selectFx(id);save(id);say('Added '+NAME[tool].toLowerCase()+'. Drag it to adjust.')}
-  else selectFx(null);
+  const [x,y]=toPt(e);
+  if(mode==='markers'){
+    const g=e.target.closest&&e.target.closest('.fx');
+    if(g){const f=fixNow().find(f=>f.id===g.dataset.id);drag={kind:'fx',id:f.id,dx:f.x-x,dy:f.y-y,moved:false};select('fx',f.id);svg.setPointerCapture(e.pointerId);e.preventDefault();return}
+    if(tool!=='move'){const id='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);setFix(id,{kind:tool,x,y,note:''});select('fx',id);saveFix(id);say('Added '+NAME[tool].toLowerCase()+'. Drag it to adjust.');return}
+    return select(null);
+  }
+  if(mode==='rooms'){
+    const t=e.target.closest&&e.target.closest('.tile');
+    if(t){const r=roomsNow().find(r=>r.id===t.dataset.id);drag={kind:'room',id:r.id,dx:r.x-x,dy:r.y-y,moved:false,wasTray:r.tray};select('room',r.id);svg.setPointerCapture(e.pointerId);e.preventDefault();return}
+    return select(null);
+  }
+  if(mode==='outlines'){
+    const h=e.target.closest&&e.target.closest('.vh');
+    if(h){drag={kind:'vertex',id:h.dataset.block,i:+h.dataset.i,moved:false};sel={type:'block',id:h.dataset.block};showSel();svg.setPointerCapture(e.pointerId);e.preventDefault();return}
+    const p=e.target.closest&&e.target.closest('.blk');
+    return select(p?'block':null,p?p.dataset.id:null);
+  }
 });
-svg.addEventListener('pointermove',e=>{if(!drag)return;const [x,y]=toPt(e);const nx=x+drag.dx,ny=y+drag.dy;drag.moved=true;setFx(drag.id,{x:nx,y:ny});fxEls[drag.id].setAttribute('transform',`translate(${nx},${ny})`)});
-const endDrag=()=>{if(!drag)return;const d=drag;drag=null;if(d.moved)save(d.id)};
+svg.addEventListener('pointermove',e=>{
+  if(!drag)return;const [x,y]=toPt(e);drag.moved=true;
+  if(drag.kind==='fx'){const nx=x+drag.dx,ny=y+drag.dy;setFix(drag.id,{x:nx,y:ny});fxEls[drag.id]&&fxEls[drag.id].setAttribute('transform',`translate(${nx},${ny})`)}
+  if(drag.kind==='room'){const nx=x+drag.dx,ny=y+drag.dy;const t=tileEls[drag.id];if(t){t.setAttribute('transform',`translate(${nx},${ny})`);svg.appendChild(t)}drag.nx=nx;drag.ny=ny}
+  if(drag.kind==='vertex'){const b=byId[drag.id];const pts=b.pts.map(p=>[...p]);pts[drag.i]=[x,y];setShape(drag.id,pts);later(render)}
+});
+const endDrag=()=>{if(!drag)return;const d=drag;drag=null;if(!d.moved){render();return}
+  if(d.kind==='fx')saveFix(d.id);
+  if(d.kind==='room'){const inTray=d.nx>806&&d.ny>16&&d.ny<trayBottom+8;setRoom(d.id,inTray?{tray:true}:{x:d.nx,y:d.ny,tray:false});saveRoom(d.id);render();showSel();
+    say(inTray?'Room '+d.id+' moved to the tray.':'Room '+d.id+' placed in '+(((roomBlock(roomsNow().find(r=>r.id===d.id))||{}).name)||'open space')+'.')}
+  if(d.kind==='vertex'){saveShape(d.id);render();showSel()}
+};
 svg.addEventListener('pointerup',endDrag);svg.addEventListener('pointercancel',endDrag);
-function onFxKey(e,id){
-  if(!editing)return;
+
+/* keyboard: arrows nudge whatever is selected */
+document.addEventListener('keydown',e=>{
+  if(!editing||!sel||/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))return;
   const step=e.shiftKey?10:2,m={ArrowLeft:[-step,0],ArrowRight:[step,0],ArrowUp:[0,-step],ArrowDown:[0,step]}[e.key];
-  if(m){e.preventDefault();const f=current().find(f=>f.id===id);setFx(id,{x:f.x+m[0],y:f.y+m[1]});fxEls[id].setAttribute('transform',`translate(${f.x+m[0]},${f.y+m[1]})`);saveSoon(id)}
-  if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();removeSel()}
-}
-function removeSel(){if(!selId)return;const id=selId;setFx(id,{deleted:true});selId=null;selBox.hidden=true;renderFix();save(id);say('Marker removed.')}
-fxKind.addEventListener('change',()=>{if(!selId)return;setFx(selId,{kind:fxKind.value});renderFix();selectFx(selId);save(selId)});
-fxNote.addEventListener('input',()=>{if(!selId)return;setFx(selId,{note:fxNote.value.trim()});saveSoon(selId)});
-document.getElementById('fxDel').addEventListener('click',removeSel);
-const toggle=document.getElementById('editToggle'),editBody=document.getElementById('editBody');
-toggle.addEventListener('click',()=>{editing=!editing;toggle.setAttribute('aria-pressed',editing);toggle.textContent=editing?'Done editing':'Edit positions';
-  editBody.hidden=!editing;svg.classList.toggle('editing',editing);if(!editing){selectFx(null)}renderFix();
-  if(editing&&!status.textContent)say(db&&canSave?'Changes save automatically.':'Connecting to storage…')});
+  if(m&&sel.type==='fx'){e.preventDefault();const f=fixNow().find(f=>f.id===sel.id);setFix(sel.id,{x:f.x+m[0],y:f.y+m[1]});renderFix();saveSoon(saveFix,sel.id)}
+  if(m&&sel.type==='room'){e.preventDefault();const r=roomsNow().find(r=>r.id===sel.id);if(r.tray)return;setRoom(sel.id,{x:r.x+m[0],y:r.y+m[1]});render();saveSoon(saveRoom,sel.id)}
+  if((e.key==='Delete'||e.key==='Backspace')&&sel.type==='fx'){e.preventDefault();removeFx()}
+});
+
+/* selection panels */
+function removeFx(){if(!sel)return;const id=sel.id;setFix(id,{deleted:true});saveFix(id);select(null);say('Marker removed.')}
+$('fxKind').addEventListener('change',()=>{setFix(sel.id,{kind:$('fxKind').value});renderFix();saveFix(sel.id)});
+$('fxNote').addEventListener('input',()=>{setFix(sel.id,{note:$('fxNote').value.trim()});saveSoon(saveFix,sel.id)});
+$('fxDel').addEventListener('click',removeFx);
+$('rmLabel').addEventListener('input',()=>{setRoom(sel.id,{label:$('rmLabel').value.trim().slice(0,8)});render();saveSoon(saveRoom,sel.id)});
+$('rmName').addEventListener('input',()=>{setRoom(sel.id,{name:$('rmName').value.trim().slice(0,60)});saveSoon(saveRoom,sel.id)});
+$('rmTray').addEventListener('click',()=>{setRoom(sel.id,{tray:true});saveRoom(sel.id);render();showSel();say('Room '+sel.id+' moved to the tray.')});
+$('rmReset').addEventListener('click',()=>{const id=sel.id;forget('rooms',id);render();showSel();say('Room '+id+' is back where the sketch put it.')});
+$('rmDel').addEventListener('click',()=>{const id=sel.id;if(baseRooms[id]){setRoom(id,{deleted:true});saveRoom(id)}else forget('rooms',id);select(null);say('Room '+id+' removed from the plan.')});
+$('bkReset').addEventListener('click',()=>{const id=sel.id;forget('shapes',id);render();showSel();say(byId[id].name+' outline reset.')});
+$('addRoomForm').addEventListener('submit',e=>{
+  e.preventDefault();const v=$('newRoom').value.trim().toUpperCase();const err=$('addErr');
+  if(!/^[0-9]{3}[A-Z]?$/.test(v)){err.textContent='Use a room number like 645 or 620C.';return}
+  if(byRoom[v]){err.textContent='Room '+v+' is already on the plan. Find it with the search box.';return}
+  err.textContent='';const home=ov.rooms[v]&&ov.rooms[v].home||'outside';
+  ov.rooms[v]={tray:true,label:'',name:'',home,x:0,y:0,deleted:false};saveRoom(v);$('newRoom').value='';render();select('room',v);say('Room '+v+' added to the tray. Drag it onto the plan.');
+});
+$('newRoom').addEventListener('input',()=>{$('addErr').textContent=''});
+
+/* modes and tools */
+const HINT={markers:'Drag a marker to its real spot. Pick a type, then tap the plan to add one.',rooms:'Drag rooms to their doors. Drag from the tray to place a room; drag back onto the tray to unplace it.',outlines:'Drag the round corner handles to reshape a block. Corridors follow.'};
+document.querySelectorAll('#modes button').forEach(b=>b.addEventListener('click',()=>{
+  mode=b.dataset.mode;document.querySelectorAll('#modes button').forEach(x=>x.setAttribute('aria-pressed',x===b));
+  $('pMarkers').hidden=mode!=='markers';$('pRooms').hidden=mode!=='rooms';$('hint').textContent=HINT[mode];
+  svg.classList.remove('mode-markers','mode-rooms','mode-outlines');svg.classList.add('mode-'+mode);select(null);
+}));
 document.querySelectorAll('#tools button').forEach(b=>b.addEventListener('click',()=>{tool=b.dataset.tool;
   document.querySelectorAll('#tools button').forEach(x=>x.setAttribute('aria-pressed',x===b));
-  document.getElementById('hint').textContent=tool==='move'?'Drag any marker to its real spot. Pick a type above, then tap the plan to add one.':'Tap the plan where the '+NAME[tool].toLowerCase()+' is. Switch back to Move to drag.'}));
-document.getElementById('copyBtn').addEventListener('click',()=>{
-  const txt=current().map(f=>`${NAME[f.kind]} | block ${blockAt(f.x,f.y)} | x ${Math.round(f.x)}, y ${Math.round(f.y)}${f.note?' | '+f.note:''}`).join('\n');
-  const done=()=>say('Copied '+current().length+' positions. Paste them into the chat.');
-  try{navigator.clipboard.writeText(txt).then(done,()=>say('Copy was blocked. Positions are saved here instead.'))}catch(_){say('Copy was blocked. Positions are saved here instead.')}
+  $('hint').textContent=tool==='move'?HINT.markers:'Tap the plan where the '+NAME[tool].toLowerCase()+' is. Switch back to Move to drag.'}));
+$('editToggle').addEventListener('click',()=>{
+  editing=!editing;$('editToggle').setAttribute('aria-pressed',editing);$('editToggle').textContent=editing?'Done editing':'Edit the plan';
+  $('editBody').hidden=!editing;svg.classList.toggle('editing',editing);svg.classList.toggle('mode-'+mode,editing);
+  if(!editing)sel=null;showSel();render();if(editing&&!status.textContent)say(db&&canSave?'Changes save automatically.':'Connecting to storage…');
 });
-renderFix();
+$('copyBtn').addEventListener('click',()=>{
+  const rooms=roomsNow().map(r=>`Room ${r.id}${r.label?' ('+r.label+')':''} | ${r.tray?'not placed':'block '+((roomBlock(r)||{}).id||'outside')+' | x '+Math.round(r.x)+', y '+Math.round(r.y)}${roomName(r)?' | '+roomName(r):''}`);
+  const fx=fixNow().map(f=>`${NAME[f.kind]} | block ${blockAt(f.x,f.y)} | x ${Math.round(f.x)}, y ${Math.round(f.y)}${f.note?' | '+f.note:''}`);
+  const sh=Object.keys(ov.shapes).map(id=>`Outline ${id} | ${flat(byId[id].pts).join(',')}`);
+  const txt=[...rooms,...fx,...sh].join('\n');
+  try{navigator.clipboard.writeText(txt).then(()=>say('Copied the whole plan. Paste it into the chat.'),()=>say('Copy was blocked. Your edits are saved here instead.'))}catch(_){say('Copy was blocked. Your edits are saved here instead.')}
+});
+
+/* ===== Viewing: search and the info panel ===== */
+const info=document.getElementById('info');
+function pill(b){return b&&b.ok?'<span class="pill ok">Position confirmed</span>':'<span class="pill guess">Position unconfirmed</span>'}
+function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function showRoom(id){
+  const r=byRoom[id];if(!r)return false;viewRoom=id;const b=roomBlock(r);
+  Object.values(blockEls).forEach(p=>p.classList.toggle('on',b&&p.dataset.id===b.id));
+  Object.values(tileEls).forEach(t=>t.classList.toggle('sel',t.dataset.id===id));
+  info.innerHTML=`<h2>Selected room</h2><div class="room-no">${esc(r.label||r.id)}</div>
+  <div style="margin-top:6px">${esc(roomName(r)||'No name recorded')}</div>
+  <dl class="kv"><dt>Block</dt><dd>${esc(b?b.name:'Not in a block')}</dd>
+  <dt>Lift</dt><dd>${esc(b?b.lift:'—')}</dd><dt>Landmarks</dt><dd>${esc(b?b.land:'—')}</dd>
+  <dt>Status</dt><dd>${pill(b)}<br><span style="font-size:12px;opacity:.7">${r.tray?'Not on the plan yet; shown in the tray':ov.rooms[id]?'Placed by hand on this plan':'Door order from your sketch'}</span></dd></dl>`;
+  return true;
+}
+function showBlock(b){
+  Object.values(blockEls).forEach(p=>p.classList.toggle('on',p.dataset.id===b.id));
+  const rs=roomsNow().filter(r=>!r.tray&&roomBlock(r)===b).map(r=>r.id).sort((a,c)=>a.localeCompare(c,undefined,{numeric:true}));
+  info.innerHTML=`<h2>Selected block</h2><div class="room-no" style="font-size:34px">${esc(b.name)}</div>
+  <dl class="kv"><dt>Rooms</dt><dd>${rs.length?esc(rs.join(', ')):'None placed'}</dd>
+  <dt>Lift</dt><dd>${esc(b.lift)}</dd><dt>Landmarks</dt><dd>${esc(b.land)}</dd><dt>Status</dt><dd>${pill(b)}</dd></dl>`;
+}
+svg.addEventListener('click',e=>{
+  if(editing)return;
+  const t=e.target.closest&&e.target.closest('.tile');if(t){showRoom(t.dataset.id);return}
+  const p=e.target.closest&&e.target.closest('.blk');if(p)showBlock(byId[p.dataset.id]);
+});
+svg.addEventListener('keydown',e=>{
+  if(editing||(e.key!=='Enter'&&e.key!==' '))return;
+  const t=e.target.closest&&e.target.closest('.tile');if(t){e.preventDefault();showRoom(t.dataset.id);return}
+  const p=e.target.closest&&e.target.closest('.blk');if(p){e.preventDefault();showBlock(byId[p.dataset.id])}
+});
+const q=document.getElementById('q'),err=document.getElementById('err');
+document.getElementById('findForm').addEventListener('submit',e=>{
+  e.preventDefault();const raw=q.value.trim().toUpperCase();
+  if(!raw){err.textContent='Enter a room number first.';return}
+  const key=byRoom[raw]?raw:Object.keys(byRoom).sort().find(k=>k.startsWith(raw));
+  if(!key||!showRoom(key)){err.textContent=`Room ${q.value.trim()} isn't on this plan. Floor 6 rooms run 601 to 678.`;return}
+  err.textContent='';
+});
+q.addEventListener('input',()=>{err.textContent=''});
+
+render();
+function roomFromHash(){const m=location.hash.match(/room=([0-9A-Za-z]+)/);if(!m)return false;const v=m[1].toUpperCase();
+  const key=byRoom[v]?v:Object.keys(byRoom).sort().find(k=>k.startsWith(v));
+  if(!key){err.textContent=`Room ${v} isn't on this plan. Floor 6 rooms run 601 to 678.`;q.value=v;return false}
+  q.value=key;showRoom(key);const t=tileEls[key];if(t&&t.scrollIntoView)t.scrollIntoView({block:'center',inline:'center',behavior:'smooth'});return true}
+if(!roomFromHash())showRoom('623');
+window.addEventListener('hashchange',roomFromHash);
+
+/* ===== Storage: saved edits from everyone with edit access ===== */
 (async()=>{
   try{db=null}catch(_){db=null}
   if(!db){if(editing)say('Not saved: changes stay on this screen until the page is opened in Claude.');return}
   canSave=true;
   
-  let timer=setTimeout(()=>say('Saved positions can\'t be reached yet; showing the sketch positions.'),10000);
-  db.collection('fixtures').onSnapshot(snap=>{
-    if(!snap.metadata.fromCache){clearTimeout(timer);if(status.textContent.startsWith('Saved positions can'))say('')}
+  let timer=setTimeout(()=>say('Saved edits can\'t be reached yet; showing the sketch positions.'),10000);
+  ['fixtures','rooms','shapes'].forEach(coll=>db.collection(coll).onSnapshot(snap=>{
+    if(!snap.metadata.fromCache){clearTimeout(timer);if(status.textContent.startsWith('Saved edits can'))say('')}
     const o={};snap.docs.forEach(d=>{const v=d.data();if(v)o[d.id]={...v}});
-    if(drag&&overrides[drag.id])o[drag.id]=overrides[drag.id];
-    overrides=o;renderFix();if(selId)selectFx(selId);
-  },err=>{clearTimeout(timer);say(err&&err.code==='revoked'?'':'Saved positions could not be loaded.')});
+    if(drag&&drag.kind==='fx'&&coll==='fixtures'&&ov.fixtures[drag.id])o[drag.id]=ov.fixtures[drag.id];
+    if(drag&&drag.kind==='vertex'&&coll==='shapes'&&ov.shapes[drag.id])o[drag.id]=ov.shapes[drag.id];
+    ov[coll]=o;if(!drag){render();showSel();if(viewRoom&&byRoom[viewRoom]&&!editing)showRoom(viewRoom)}
+  },e=>{clearTimeout(timer);say(e&&e.code==='revoked'?'':'Saved edits could not be loaded.')}));
 })();
-const info=document.getElementById('info');
-function clear(){Object.values(tileEls).forEach(t=>t.classList.remove('sel'));Object.values(blockEls).forEach(p=>p.classList.remove('on'))}
-function pill(b){return b.ok?'<span class="pill ok">Position confirmed</span>':'<span class="pill guess">Position unconfirmed</span>'}
-function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
-function select(r){
-  const b=byRoom[r];if(!b)return false;clear();
-  tileEls[r].classList.add('sel');blockEls[b.id].classList.add('on');
-  const placed=!unplaced.includes(r);
-  info.innerHTML=`<h2>Selected room</h2><div class="room-no">${esc(r)}</div>
-  <div style="margin-top:6px">${esc(roomNotes[r]||'No name recorded')}</div>
-  <dl class="kv"><dt>Block</dt><dd>${esc(b.name)}</dd>
-  <dt>Lift</dt><dd>${esc(b.lift)}</dd><dt>Landmarks</dt><dd>${esc(b.land)}</dd>
-  <dt>Status</dt><dd>${pill(b)}<br><span style="font-size:12px;opacity:.7">${placed?'Door order from your sketch':'Not on any sketch yet; shown in the tray'}</span></dd></dl>`;
-  return true;
-}
-function showBlock(b){
-  clear();blockEls[b.id].classList.add('on');
-  const rs=b.rooms;
-  info.innerHTML=`<h2>Selected block</h2><div class="room-no" style="font-size:34px">${esc(b.name)}</div>
-  <dl class="kv"><dt>Rooms</dt><dd>${rs.length?esc(rs[0])+' – '+esc(rs[rs.length-1])+' ('+rs.length+')':'None, common area'}</dd>
-  <dt>Lift</dt><dd>${esc(b.lift)}</dd><dt>Landmarks</dt><dd>${esc(b.land)}</dd><dt>Status</dt><dd>${pill(b)}</dd></dl>`;
-}
-const q=document.getElementById('q'),err=document.getElementById('err');
-document.getElementById('findForm').addEventListener('submit',e=>{
-  e.preventDefault();const raw=q.value.trim().toUpperCase();
-  if(!raw){err.textContent='Enter a room number first.';return}
-  const key=byRoom[raw]?raw:(byRoom[parseInt(raw,10)]&&String(parseInt(raw,10))===raw?parseInt(raw,10):Object.keys(byRoom).find(k=>k.startsWith(raw)));
-  const hit=key===undefined?false:select(isNaN(key)?key:+key);
-  if(!hit){err.textContent=`Room ${q.value.trim()} isn't on this plan. Floor 6 rooms run 601 to 678.`;return}
-  err.textContent='';
-});
-q.addEventListener('input',()=>{err.textContent=''});
-select(623);
 })();
+
 </script>
 </body>
 </html>

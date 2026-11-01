@@ -273,6 +273,17 @@ $$('.tile').forEach((t) => t.addEventListener('click', async (e) => {
   }
 }));
 
+// Room search: opens VIT Nav on that room.
+$('#roomfind').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const v = $('#room-q').value.trim().toUpperCase().replace(/^PRP\s*/, '');
+  const err = $('#room-err');
+  if (!v) { err.textContent = 'Type a room number, like 623.'; $('#room-q').focus(); return; }
+  if (!/^6\d{2}[A-Z]?$/.test(v)) { err.textContent = 'VIT Nav has PRP level 6 for now: rooms 601 to 678.'; $('#room-q').focus(); return; }
+  location.href = 'nav/index.html#room=' + encodeURIComponent(v);
+});
+$('#room-q').addEventListener('input', () => { $('#room-err').textContent = ''; });
+
 /* ---------------- drawer ---------------- */
 let lastFocus = null;
 function fillInfo() {
@@ -340,6 +351,17 @@ $('#signout').addEventListener('click', async () => {
   show('screen-auth');
 });
 
+$('#delete-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const v = $('#del-confirm').value.trim().toUpperCase(), err = $('#del-error');
+  if (v !== 'DELETE') { err.textContent = 'Type DELETE to confirm.'; $('#del-confirm').focus(); return; }
+  try {
+    await api('/me', { method: 'DELETE', body: { confirm: v } });
+    remember(null); closeDrawer(); show('screen-auth'); toast('Your account has been deleted.');
+  } catch (x) { err.textContent = x.message; }
+});
+$('#del-confirm').addEventListener('input', () => { $('#del-error').textContent = ''; });
+
 /* ---------------- routing ---------------- */
 function route() {
   if (!me) { show('screen-auth'); $('#email').focus(); return; }
@@ -350,6 +372,11 @@ function route() {
   greet(); show('screen-main'); loadOrders();
   const note = store.get('hub_last_note');
   if (note) { $('#open-note').textContent = note; store.del('hub_last_note'); }
+}
+
+// Installable app: cache the hub so it opens even on a weak connection.
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
 
 (async function init() {
