@@ -1,0 +1,79 @@
+/* UniHub shared look: one blue family, several gradients, one font pair.
+   Loaded by the hub page and, last in <head>, by every module so their own colour variables follow it.
+   ":root:root" outranks the modules' ":root" without needing !important. */
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap");
+
+:root:root {
+  --u-950: #081233; --u-900: #0e1d55; --u-800: #15297a; --u-700: #1d38a3; --u-600: #2648c9;
+  --u-500: #3a63ea; --u-400: #6b8cf2; --u-300: #9db4f7; --u-200: #c9d6fb; --u-100: #e4ebfe; --u-50: #f3f6ff;
+
+  --g-brand: linear-gradient(135deg, #1d38a3 0%, #3a63ea 100%);
+  --g-xerox: linear-gradient(140deg, #0e1d55 0%, #2648c9 100%);
+  --g-food: linear-gradient(140deg, #1d38a3 0%, #5a7ef0 100%);
+  --g-travel: linear-gradient(140deg, #15297a 0%, #3a63ea 55%, #6b8cf2 100%);
+  --g-pg: linear-gradient(160deg, #081233 0%, #1d38a3 70%, #2648c9 100%);
+  --g-nav: linear-gradient(120deg, #2648c9 0%, #3a63ea 45%, #0e1d55 100%);
+
+  --uh-bg: #f3f6ff; --uh-surface: #ffffff; --uh-surface-2: #eef2ff; --uh-line: #dbe3fb;
+  --uh-text: #0e1a45; --uh-muted: #55618c; --uh-accent: #2648c9; --uh-accent-ink: #ffffff;
+  --uh-ok: #12795a; --uh-bad: #b42335; --uh-warn: #a15c07;
+  --uh-shadow: 0 10px 30px rgba(14, 29, 85, .10);
+
+  --f-display: "Sora", "Segoe UI", system-ui, sans-serif;
+  --f-body: "DM Sans", "Segoe UI", system-ui, sans-serif;
+
+  /* Food module */
+  --color-accent: #2648c9; --color-btn-info: #2648c9;
+  --gradient-brand: var(--g-food); --gradient-btn: var(--g-brand);
+  --color-page-bg: var(--uh-bg); --color-panel-bg: var(--uh-surface-2); --color-card-bg: var(--uh-surface);
+  --color-card-soft: var(--uh-surface-2); --color-border: var(--uh-line); --color-text-primary: var(--uh-text); --color-text-muted: var(--uh-muted);
+  /* Travel module */
+  --a1: #1d38a3; --a2: #3a63ea; --nav: #15297a; --who: #2648c9;
+  --bg: var(--uh-bg); --card: var(--uh-surface); --line: var(--uh-line); --text: var(--uh-text); --muted: var(--uh-muted);
+  /* Xerox module */
+  --g1: #0e1d55; --g2: #2648c9; --dot: #3a63ea; --tx: var(--uh-text); --mut: var(--uh-muted);
+  /* PG module */
+  --grad: var(--g-brand);
+}
+
+:root:root[data-theme="dark"] {
+  color-scheme: dark;
+  --uh-bg: #070d24; --uh-surface: #0f1838; --uh-surface-2: #16214a; --uh-line: #24316a;
+  --uh-text: #e8edff; --uh-muted: #9aa7d6; --uh-accent: #6b8cf2; --uh-accent-ink: #081233;
+  --uh-ok: #5fd3a8; --uh-bad: #ff8f9c; --uh-warn: #f5b94f;
+  --uh-shadow: 0 10px 30px rgba(0, 0, 0, .35);
+
+  --color-accent: #6b8cf2; --color-btn-info: #3a63ea;
+  --color-page-bg: var(--uh-bg); --color-panel-bg: var(--uh-surface); --color-card-bg: var(--uh-surface);
+  --color-card-soft: var(--uh-surface-2); --color-border: var(--uh-line); --color-text-primary: var(--uh-text); --color-text-muted: var(--uh-muted);
+  --who: #9db4f7; --bubble: var(--uh-surface-2);
+  --bg: var(--uh-bg); --card: var(--uh-surface); --line: var(--uh-line); --text: var(--uh-text); --muted: var(--uh-muted);
+  --tx: var(--uh-text); --mut: var(--uh-muted); --dot: #9db4f7; --dis: #1a2552;
+}
+
+/* One font pair everywhere */
+html body { font-family: var(--f-body); }
+html body :is(h1, h2, h3, .hero h1, .logo-text, .brand, .title) { font-family: var(--f-display); letter-spacing: -0.01em; }
+html body :is(input, select, textarea, button) { font-family: inherit; }
+
+/* Module chrome that used hard-coded colours */
+html[data-unihub-module] .top { background: var(--g-brand); }
+html[data-unihub-module] .hero { background: var(--g-brand); }
+html[data-unihub-module="food"] body { background: var(--uh-bg); }
+
+/* The "Back to Campus Hub" bar the hub adds to every module */
+.uh-back {
+  position: fixed; z-index: 2147483000; left: max(12px, env(safe-area-inset-left, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px;
+  background: var(--g-brand); color: #fff; font: 600 13px/1 var(--f-body); text-decoration: none;
+  box-shadow: 0 8px 22px rgba(14, 29, 85, .35);
+}
+.uh-back:focus-visible { outline: 3px solid var(--u-300); outline-offset: 2px; }
+@media print { .uh-back { display: none; } }
+
+/* PG launch page (pg/index.html) uses --fg/--accent of its own */
+html[data-unihub-module="pg"] { --fg: var(--uh-text); --muted: var(--uh-muted); --accent: var(--uh-accent); --on-accent: #fff; }
+html[data-unihub-module="pg"] body { background: var(--uh-bg); }
+html[data-unihub-module="pg"] .bar { border-bottom-color: var(--uh-line); background: var(--uh-surface); }
+html[data-unihub-module="pg"] .btn { background: var(--g-brand); color: #fff; box-shadow: 0 8px 20px rgba(29, 56, 163, .28); }
+html[data-unihub-module="pg"] .wrap h1 { font-size: 34px; }

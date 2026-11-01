@@ -1,197 +1,200 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Startup College • Campus All-in-One Super App</title>
-  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
-  <style>
-    .module-card {
-      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .module-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 12px 28px -6px rgba(124, 58, 237, 0.35);
-    }
-  </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>UniHub · VIT Vellore</title>
+  <meta name="description" content="UniHub: print, eat, travel, find a PG and find your way around VIT Vellore with one sign-in.">
+  <meta name="theme-color" content="#1d38a3">
+  <link rel="icon" href="hub/web/icon.svg" type="image/svg+xml">
+  <script src="hub/web/sync.js"></script>
+  <link rel="stylesheet" href="hub/web/theme.css">
+  <link rel="stylesheet" href="hub/web/hub.css">
+  <script src="xerox/config.js"></script>
+  <script type="module" src="hub/web/app.js"></script>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-8 font-sans antialiased flex flex-col items-center">
+<body>
+  <div class="splash" id="splash" aria-live="polite"><span class="mark" aria-hidden="true"></span><span>Opening UniHub…</span></div>
 
-  <!-- Header Banner -->
-  <header class="max-w-4xl w-full bg-slate-900/90 border border-slate-800 rounded-3xl p-6 mb-6 shadow-2xl backdrop-blur flex flex-col md:flex-row items-center justify-between gap-4">
-    <div class="flex items-center space-x-4">
-      <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-500 to-amber-500 flex items-center justify-center text-3xl shadow-lg shadow-purple-950/50">
-        🎓
-      </div>
-      <div>
-        <h1 class="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-          Startup College
-          <span class="px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-mono font-bold uppercase tracking-wider">
-            Super App Hub
-          </span>
-        </h1>
-        <p class="text-xs text-slate-400 mt-0.5">
-          Unified campus services merging Food, Travel, Campus Navigation, Xerox, and PG
-        </p>
-      </div>
+  <!-- Sign in -->
+  <section class="auth" id="screen-auth" hidden aria-labelledby="auth-title">
+    <div class="auth-brand">
+      <div class="brand-row"><span class="mark" aria-hidden="true"></span><span class="brand">UniHub</span></div>
+      <h1 id="auth-title">Everything on campus, one sign-in.</h1>
+      <p class="lead">For VIT Vellore students. Print notes, order from the canteen, share a cab, find a PG and find your way around PRP.</p>
+      <ul class="auth-points">
+        <li><span class="dot"></span>Sign in with your @vitstudent.ac.in email</li>
+        <li><span class="dot"></span>We email you a 6-digit code, no password to remember</li>
+        <li><span class="dot"></span>Your orders and details stay in one place</li>
+      </ul>
     </div>
 
-    <div class="flex items-center space-x-2 font-mono text-xs">
-      <span class="px-3 py-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-xl font-bold flex items-center gap-1.5">
-        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        5 Core Modules Integrated
-      </span>
+    <div class="auth-card">
+      <form id="email-form" novalidate>
+        <h2>Sign in</h2>
+        <p class="muted">Use your college email. We’ll send a code to it.</p>
+        <label for="email">College email</label>
+        <input id="email" name="email" type="email" inputmode="email" autocomplete="email" placeholder="name.surname2024@vitstudent.ac.in" required>
+        <p class="field-error" id="email-error" role="alert"></p>
+        <button class="btn primary" type="submit" id="send-btn">Send code</button>
+      </form>
+
+      <form id="code-form" novalidate hidden>
+        <h2>Check your email</h2>
+        <p class="muted">We sent a 6-digit code to <strong id="code-email"></strong>. It expires in 10 minutes.</p>
+        <div class="dev-note" id="dev-note" hidden></div>
+        <label for="code">Sign-in code</label>
+        <input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••" class="code-input" required>
+        <p class="field-error" id="code-error" role="alert"></p>
+        <button class="btn primary" type="submit" id="verify-btn">Sign in</button>
+        <div class="row-links">
+          <button type="button" class="link" id="resend-btn">Send a new code</button>
+          <button type="button" class="link" id="change-email">Use a different email</button>
+        </div>
+      </form>
     </div>
-  </header>
+  </section>
 
-  <!-- 5-Service Grid Hub (Merging All Modules) -->
-  <main class="max-w-4xl w-full">
-    <div class="flex items-center justify-between mb-3 px-1">
-      <span class="text-xs font-mono uppercase tracking-wider text-purple-400 font-bold">
-        Integrated Campus Modules:
-      </span>
-      <span class="text-[11px] text-slate-500 font-mono">Select any module to launch</span>
+  <!-- First sign-in: profile -->
+  <section class="onboard" id="screen-onboard" hidden aria-labelledby="ob-title">
+    <form class="sheet-card" id="onboard-form" novalidate>
+      <div class="brand-row small"><span class="mark" aria-hidden="true"></span><span class="brand">UniHub</span></div>
+      <h1 id="ob-title">A few details first</h1>
+      <p class="muted">Shop owners see your name and number on orders. Travel and PG use gender to match you with the right group.</p>
+      <div class="grid2">
+        <div class="field"><label for="ob-name">Full name</label><input id="ob-name" name="name" autocomplete="name" required><p class="field-error" data-for="name"></p></div>
+        <div class="field"><label for="ob-reg">Registration number</label><input id="ob-reg" name="regNo" autocomplete="off" placeholder="22BCE1234" required><p class="field-error" data-for="regNo"></p></div>
+        <div class="field"><label for="ob-phone">Mobile number</label><input id="ob-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="98765 43210" required><p class="field-error" data-for="phone"></p></div>
+        <div class="field"><span class="label" id="ob-gender-l">Gender</span>
+          <div class="seg" role="radiogroup" aria-labelledby="ob-gender-l">
+            <label><input type="radio" name="gender" value="female"><span>Female</span></label>
+            <label><input type="radio" name="gender" value="male"><span>Male</span></label>
+          </div><p class="field-error" data-for="gender"></p></div>
+      </div>
+      <div class="field"><label for="ob-email">College email</label><input id="ob-email" readonly></div>
+      <p class="field-error" id="ob-error" role="alert"></p>
+      <button class="btn primary" type="submit">Continue to UniHub</button>
+    </form>
+  </section>
+
+  <!-- Home -->
+  <section class="home" id="screen-main" hidden>
+    <header class="topbar">
+      <a class="brand-row" href="./" aria-label="UniHub home"><span class="mark" aria-hidden="true"></span><span class="brand">UniHub</span></a>
+      <button class="avatar-btn" id="avatar-btn" aria-haspopup="dialog" aria-controls="drawer" aria-label="Open your profile">
+        <span class="avatar" id="avatar-initials">U</span>
+      </button>
+    </header>
+
+    <main class="home-main">
+      <div class="greet">
+        <p class="eyebrow" id="today"></p>
+        <h1 id="greeting">Hello</h1>
+        <p class="muted" id="greet-sub">What do you need today?</p>
+      </div>
+
+      <div class="activity" id="activity" hidden></div>
+
+      <div class="tiles" id="tiles">
+        <a class="tile xerox" href="xerox/index.html" data-open="xerox">
+          <span class="tile-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 14h10v7H7z"/></svg></span>
+          <span class="tile-k">Xerox</span>
+          <span class="tile-h">Print without the queue</span>
+          <span class="tile-p">Upload lab manuals and assignments, pick B&amp;W, colour or binding, pay, and collect with a token.</span>
+          <span class="tile-cta">Open Xerox <span aria-hidden="true">→</span></span>
+        </a>
+        <a class="tile food" href="food/index.html" data-open="food">
+          <span class="tile-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 11h18a9 9 0 0 1-18 0zM7 4c0 1.5 1 1.5 1 3M12 3c0 1.5 1 1.5 1 3M17 4c0 1.5 1 1.5 1 3"/></svg></span>
+          <span class="tile-k">Food</span>
+          <span class="tile-h">Order from the canteen</span>
+          <span class="tile-p">Browse menus, see what’s in stock, order ahead and pick up when your token turns ready.</span>
+          <span class="tile-cta">Open Food <span aria-hidden="true">→</span></span>
+        </a>
+        <a class="tile travel" href="travel/index.html" data-open="travel">
+          <span class="tile-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 16V11l2-5h10l2 5v5M3 16h18v3H3zM7 19v2M17 19v2M7 13h.01M17 13h.01"/></svg></span>
+          <span class="tile-k">Travel</span>
+          <span class="tile-h">Share a cab or auto</span>
+          <span class="tile-p">Find students going to Katpadi or the airport at the same time, split the fare and chat.</span>
+          <span class="tile-cta">Open Travel <span aria-hidden="true">→</span></span>
+        </a>
+        <a class="tile pg" href="pg/index.html" data-open="pg">
+          <span class="tile-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 21V10l9-6 9 6v11M9 21v-6h6v6"/></svg></span>
+          <span class="tile-k">PG</span>
+          <span class="tile-h">Find a PG and roommates</span>
+          <span class="tile-p">Match with same-gender students moving in around the same date and book a PG together.</span>
+          <span class="tile-cta">Open PG <span aria-hidden="true">→</span></span>
+        </a>
+        <a class="tile nav" href="nav/index.html" data-open="nav">
+          <span class="tile-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+          <span class="tile-k">VIT Nav</span>
+          <span class="tile-h">Find any room in PRP</span>
+          <span class="tile-p">Level 6 of Pearl Research Park: every room from 601 to 678, with lifts and stairs. More floors are coming.</span>
+          <span class="tile-cta">Open map <span aria-hidden="true">→</span></span>
+          <svg class="tile-map" viewBox="0 0 200 120" aria-hidden="true"><path d="M20 112 L28 50 L52 40 L64 60 L60 112 Z M140 112 L136 60 L150 40 L176 50 L182 112 Z M64 60 L80 40 L100 34 L120 40 L136 60 M80 40 L86 18 L114 18 L120 40"/></svg>
+        </a>
+      </div>
+      <p class="note" id="open-note" role="status"></p>
+    </main>
+  </section>
+
+  <!-- Profile drawer -->
+  <div class="scrim" id="scrim" hidden></div>
+  <aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-name" hidden>
+    <div class="drawer-head">
+      <span class="avatar lg" id="drawer-initials">U</span>
+      <div class="who"><h2 id="drawer-name">You</h2><p id="drawer-email" class="muted"></p></div>
+      <button class="icon-btn" id="drawer-close" aria-label="Close profile">✕</button>
     </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      
-      <!-- 1. FOOD -->
-      <div onclick="launchModule('food')" class="module-card bg-slate-900 border border-slate-800 hover:border-amber-500/60 rounded-3xl p-5 cursor-pointer flex flex-col justify-between h-48 group">
-        <div class="flex items-start justify-between">
-          <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-2xl group-hover:scale-110 transition">
-            🍔
-          </div>
-          <span class="text-[10px] font-mono px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30 font-bold">
-            /food
-          </span>
-        </div>
-        <div>
-          <h3 class="text-base font-black text-white group-hover:text-amber-300 transition">Food & Canteen</h3>
-          <p class="text-xs text-slate-400 mt-1 line-clamp-2">
-            Campus dining menus, cafeteria ordering, and late-night snacks delivery.
-          </p>
-        </div>
-        <div class="text-[11px] font-mono text-amber-400 font-bold flex items-center gap-1">
-          Open Module <span>➔</span>
-        </div>
-      </div>
+    <div class="drawer-body">
+      <section class="d-sec" aria-labelledby="sec-info">
+        <div class="d-sec-h"><h3 id="sec-info">Personal info</h3><button class="link" id="edit-info">Edit</button></div>
+        <dl class="info" id="info-view">
+          <div><dt>Name</dt><dd data-k="name"></dd></div>
+          <div><dt>Mobile</dt><dd data-k="phone"></dd></div>
+          <div><dt>Email</dt><dd data-k="email"></dd></div>
+          <div><dt>Reg. no.</dt><dd data-k="regNo"></dd></div>
+          <div><dt>Gender</dt><dd data-k="gender"></dd></div>
+        </dl>
+        <form id="info-form" hidden novalidate>
+          <div class="field"><label for="pf-name">Full name</label><input id="pf-name" name="name" autocomplete="name"><p class="field-error" data-for="name"></p></div>
+          <div class="field"><label for="pf-phone">Mobile number</label><input id="pf-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel"><p class="field-error" data-for="phone"></p></div>
+          <div class="field"><label for="pf-reg">Registration number</label><input id="pf-reg" name="regNo"><p class="field-error" data-for="regNo"></p></div>
+          <div class="field"><span class="label" id="pf-gender-l">Gender</span>
+            <div class="seg" role="radiogroup" aria-labelledby="pf-gender-l">
+              <label><input type="radio" name="gender" value="female"><span>Female</span></label>
+              <label><input type="radio" name="gender" value="male"><span>Male</span></label>
+            </div><p class="field-error" data-for="gender"></p></div>
+          <p class="muted small">Your email can’t be changed here because you sign in with it.</p>
+          <div class="row-btns"><button class="btn primary" type="submit">Save</button><button class="btn ghost" type="button" id="cancel-info">Cancel</button></div>
+        </form>
+      </section>
 
-      <!-- 2. TRAVEL -->
-      <div onclick="launchModule('travel')" class="module-card bg-slate-900 border border-slate-800 hover:border-indigo-500/60 rounded-3xl p-5 cursor-pointer flex flex-col justify-between h-48 group">
-        <div class="flex items-start justify-between">
-          <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-2xl group-hover:scale-110 transition">
-            🚖
+      <section class="d-sec" aria-labelledby="sec-orders">
+        <div class="d-sec-h"><h3 id="sec-orders">Order history</h3>
+          <div class="chips" role="group" aria-label="Show orders from">
+            <button class="chip" aria-pressed="true" data-filter="all">All</button>
+            <button class="chip" aria-pressed="false" data-filter="food">Food</button>
+            <button class="chip" aria-pressed="false" data-filter="xerox">Xerox</button>
           </div>
-          <span class="text-[10px] font-mono px-2.5 py-1 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/30 font-bold">
-            /travel
-          </span>
         </div>
-        <div>
-          <h3 class="text-base font-black text-white group-hover:text-indigo-300 transition">Travel & Commute</h3>
-          <p class="text-xs text-slate-400 mt-1 line-clamp-2">
-            Campus shuttles schedule, auto-sharing, railway/airport cab pools.
-          </p>
-        </div>
-        <div class="text-[11px] font-mono text-indigo-400 font-bold flex items-center gap-1">
-          Open Module <span>➔</span>
-        </div>
-      </div>
+        <ul class="orders" id="orders"></ul>
+      </section>
 
-      <!-- 3. NAV -->
-      <div onclick="launchModule('nav')" class="module-card bg-gradient-to-br from-purple-950/40 via-slate-900 to-slate-900 border-2 border-purple-500/60 hover:border-purple-400 rounded-3xl p-5 cursor-pointer flex flex-col justify-between h-48 group shadow-lg shadow-purple-950/40">
-        <div class="flex items-start justify-between">
-          <div class="w-12 h-12 rounded-2xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-2xl group-hover:scale-110 transition">
-            🧭
-          </div>
-          <span class="text-[10px] font-mono px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 font-bold">
-            /nav ★ Active
-          </span>
+      <section class="d-sec" aria-labelledby="sec-look">
+        <div class="d-sec-h"><h3 id="sec-look">Appearance</h3></div>
+        <div class="seg wide" role="radiogroup" aria-labelledby="sec-look" id="theme-seg">
+          <label><input type="radio" name="theme" value="light"><span>Light</span></label>
+          <label><input type="radio" name="theme" value="dark"><span>Dark</span></label>
+          <label><input type="radio" name="theme" value="system"><span>System</span></label>
         </div>
-        <div>
-          <h3 class="text-base font-black text-white group-hover:text-purple-300 transition">Campus Navigation</h3>
-          <p class="text-xs text-slate-300 mt-1 line-clamp-2">
-            POV Walking Video & Real-Photo turn-by-turn guidance for PRP 6th Floor (600–678).
-          </p>
-        </div>
-        <div class="text-[11px] font-mono text-purple-300 font-bold flex items-center gap-1">
-          Open Module <span>➔</span>
-        </div>
-      </div>
+        <p class="muted small">Applies to UniHub and every section inside it.</p>
+      </section>
 
-      <!-- 4. XEROX -->
-      <div onclick="launchModule('xerox')" class="module-card bg-slate-900 border border-slate-800 hover:border-cyan-500/60 rounded-3xl p-5 cursor-pointer flex flex-col justify-between h-48 group">
-        <div class="flex items-start justify-between">
-          <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-2xl group-hover:scale-110 transition">
-            🖨️
-          </div>
-          <span class="text-[10px] font-mono px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 font-bold">
-            /xerox
-          </span>
-        </div>
-        <div>
-          <h3 class="text-base font-black text-white group-hover:text-cyan-300 transition">Xerox & Print Hub</h3>
-          <p class="text-xs text-slate-400 mt-1 line-clamp-2">
-            Fast document uploading, lab manual printouts, and hostel doorstep xerox delivery.
-          </p>
-        </div>
-        <div class="text-[11px] font-mono text-cyan-400 font-bold flex items-center gap-1">
-          Open Module <span>➔</span>
-        </div>
-      </div>
-
-      <!-- 5. PG -->
-      <div onclick="launchModule('pg')" class="module-card bg-slate-900 border border-slate-800 hover:border-emerald-500/60 rounded-3xl p-5 cursor-pointer flex flex-col justify-between h-48 group">
-        <div class="flex items-start justify-between">
-          <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-2xl group-hover:scale-110 transition">
-            🏠
-          </div>
-          <span class="text-[10px] font-mono px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 font-bold">
-            /pg
-          </span>
-        </div>
-        <div>
-          <h3 class="text-base font-black text-white group-hover:text-emerald-300 transition">PG & Accommodations</h3>
-          <p class="text-xs text-slate-400 mt-1 line-clamp-2">
-            Verified student PGs, apartments, rent details, and flatmate matching around campus.
-          </p>
-        </div>
-        <div class="text-[11px] font-mono text-emerald-400 font-bold flex items-center gap-1">
-          Open Module <span>➔</span>
-        </div>
-      </div>
-
-      <!-- 6. SYSTEM STATUS / INTEGRATION -->
-      <div class="bg-slate-900/50 border border-dashed border-slate-800 rounded-3xl p-5 flex flex-col justify-between h-48">
-        <div class="flex items-start justify-between">
-          <div class="w-12 h-12 rounded-2xl bg-slate-800/50 border border-slate-700/50 flex items-center justify-center text-2xl">
-            🔗
-          </div>
-          <span class="text-[10px] font-mono px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 font-bold">
-            index.html
-          </span>
-        </div>
-        <div>
-          <h3 class="text-base font-bold text-slate-300">Merger & Orchestrator</h3>
-          <p class="text-xs text-slate-500 mt-1">
-            Root orchestrator file coordinating data and routing between all 5 modules.
-          </p>
-        </div>
-        <div class="text-[10px] font-mono text-slate-500">
-          Status: Operational ✓
-        </div>
-      </div>
-
+      <button class="btn danger-ghost" id="signout">Sign out</button>
     </div>
-  </main>
+  </aside>
 
-  <!-- Script to Handle Module Routing -->
-  <script>
-    function launchModule(moduleName) {
-      console.log(`Launching module: ${moduleName}`);
-      // When each module subfolder has its own index.html or view, this navigates directly to it
-      window.location.href = `./${moduleName}/index.html`;
-    }
-  </script>
-
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 </body>
 </html>
