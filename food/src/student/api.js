@@ -9,7 +9,7 @@ const API_BASE_URL = (() => {
     return envUrl.replace(/\/$/, '');
   }
   if (typeof window !== 'undefined') {
-    if ((window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') && window.location.port !== '') {
+    if ((window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') && window.location.port === '5173') {
       return 'http://127.0.0.1:8000';
     }
   }

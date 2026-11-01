@@ -116,3 +116,31 @@ test('mailer speaks SMTP: EHLO, AUTH, MAIL, RCPT, DATA', async () => {
   assert.match(data, /Subject: 123456 is your code/);
   assert.match(data, /Code 123456/);
 });
+
+test('Travel calls and websockets pass through; module settings come from .env', async () => {
+  const net = await import('node:net');
+  const http = await import('node:http');
+  const travel = http.createServer((req, res) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ path: req.url, auth: req.headers.authorization || '', cookie: req.headers.cookie || '' })); });
+  travel.on('upgrade', (req, sock) => { sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n'); sock.end('hello'); });
+  await new Promise((r) => travel.listen(0, r));
+  const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'unihub-'));
+  const cfg2 = { ...makeConfig({ NODE_ENV: 'test' }), dataFile: path.join(dir2, 'hub.json'), travelApiUrl: `http://127.0.0.1:${travel.address().port}`, xeroxSupabaseUrl: 'https://abc.supabase.co', xeroxSupabaseKey: 'anon-key' };
+  const { server: s2 } = createApp(cfg2);
+  await new Promise((r) => s2.listen(0, r));
+  const b2 = `http://127.0.0.1:${s2.address().port}`;
+  const r = await fetch(b2 + '/api/groups?x=1', { headers: { authorization: 'Bearer t', cookie: 'hub_session=secret' } }).then((x) => x.json());
+  assert.deepEqual(r, { path: '/api/groups?x=1', auth: 'Bearer t', cookie: '' });
+  assert.match(await fetch(b2 + '/xerox/config.js').then((x) => x.text()), /abc\.supabase\.co/);
+  assert.match(await fetch(b2 + '/travel/config.js').then((x) => x.text()), /API_URL: ""/);
+  const st = await fetch(b2 + '/api/hub/status').then((x) => x.json());
+  assert.equal(st.travel, true); assert.equal(st.xerox, true);
+  const got = await new Promise((resolve) => {
+    const c = net.connect(s2.address().port, '127.0.0.1', () => c.write('GET /socket.io/?EIO=4&transport=websocket HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n'));
+    let buf = ''; c.on('data', (d) => { buf += d; }); c.on('close', () => resolve(buf));
+  });
+  assert.match(got, /101 Switching Protocols[\s\S]*hello/);
+  s2.close(); travel.close();
+  const off = await fetch(base + '/api/groups');
+  assert.equal(off.status, 503);
+  assert.match((await off.json()).error, /Travel isn’t connected yet/);
+});

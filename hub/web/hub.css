@@ -180,3 +180,5 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .danger-zone summary { cursor: pointer; color: var(--uh-muted); font-size: 14px; font-weight: 500; }
 .danger-zone form { margin-top: 10px; display: grid; gap: 8px; }
 .btn.danger-solid { background: var(--uh-bad); color: #fff; width: 100%; }
+
+.tile-badge { position: absolute; top: 20px; right: 20px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.3); color: #fff; }

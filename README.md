@@ -10,4 +10,6 @@ cd hub && node server.js   # http://localhost:3000
 - `xerox/`, `food/`, `travel/`, `pg/`: the modules, each with its own README.
 - `nav/`: VIT Nav (CampusNavi), currently a static plan of PRP level 6.
 
+To make all four sections work, follow [SETUP.md](SETUP.md).
+
 Every module page loads `hub/web/theme.css` and `hub/web/sync.js`, so they share one look and the hub's light/dark setting.

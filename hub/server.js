@@ -2,6 +2,9 @@
 // signed hand-off tokens for the Travel and PG modules, and the static campus site.
 // Zero dependencies: Node 20+ only.
 import http from 'node:http';
+import https from 'node:https';
+import net from 'node:net';
+import tls from 'node:tls';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -40,6 +43,9 @@ export function makeConfig(env = process.env) {
     travelSecret: env.TRAVEL_JWT_SECRET || '',
     pgSecret: env.UNIHUB_SSO_SECRET || '',
     pgUrl: (env.PG_URL || 'https://placemate-x6pt.onrender.com').replace(/\/$/, ''),
+    travelApiUrl: (env.TRAVEL_API_URL || '').replace(/\/$/, ''),
+    xeroxSupabaseUrl: env.XEROX_SUPABASE_URL || '',
+    xeroxSupabaseKey: env.XEROX_SUPABASE_ANON_KEY || '',
     dataFile: env.DATA_FILE || path.join(HUB_DIR, 'data', 'hub.json'),
   };
 }
@@ -156,6 +162,16 @@ export function createApp(cfg = makeConfig(), deps = {}) {
     const m = req.method;
 
     if (p === '/api/health' && m === 'GET') return send(res, 200, { ok: true });
+
+    if (p === '/api/hub/status' && m === 'GET') {
+      return send(res, 200, {
+        xerox: Boolean(cfg.xeroxSupabaseUrl && cfg.xeroxSupabaseKey),
+        food: true,
+        travel: Boolean(cfg.travelApiUrl),
+        pg: Boolean(cfg.pgUrl),
+        signedHandoff: { travel: Boolean(cfg.travelSecret), pg: Boolean(cfg.pgSecret) },
+      });
+    }
 
     if (p === '/api/hub/config' && m === 'GET') {
       return send(res, 200, { appName: cfg.appName, domain: cfg.domain, devCodes: cfg.showDevCodes && !cfg.smtpUrl, mail: Boolean(cfg.smtpUrl) });
@@ -297,7 +313,11 @@ export function createApp(cfg = makeConfig(), deps = {}) {
     res.setHeader('X-Frame-Options', 'SAMEORIGIN');
     const url = new URL(req.url, 'http://local');
     try {
-      if (url.pathname.startsWith('/api/')) return await api(req, res, url);
+      if (url.pathname.startsWith('/api/hub/') || url.pathname === '/api/health') return await api(req, res, url);
+      // Every other /api call and /socket.io belongs to the Travel server; pass it through.
+      if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/socket.io/')) return proxyTravel(req, res);
+      const runtime = runtimeConfig(url.pathname);
+      if (runtime !== null) return send(res, 200, runtime, { 'Content-Type': 'text/javascript; charset=utf-8' });
       if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'Method not allowed');
       return serveStatic(req, res, url);
     } catch (err) {
@@ -306,6 +326,50 @@ export function createApp(cfg = makeConfig(), deps = {}) {
       return fail(res, 500, 'SERVER', 'Something went wrong on our side.');
     }
   });
+  // Module settings that used to be edited by hand now come from hub/.env.
+  function runtimeConfig(pathname) {
+    if (pathname === '/xerox/config.js' || pathname === '/xerox/owner/config.js') {
+      if (!cfg.xeroxSupabaseUrl) return null; // fall back to the file in the repo
+      return `window.XEROX_CONFIG = ${JSON.stringify({ supabaseUrl: cfg.xeroxSupabaseUrl, supabaseAnonKey: cfg.xeroxSupabaseKey })};\n`;
+    }
+    if (pathname === '/travel/config.js') return 'window.TRAVEL_CONFIG = { API_URL: "" }; // UniHub forwards /api and /socket.io to the Travel server\n';
+    return null;
+  }
+
+  function proxyTravel(req, res) {
+    if (!cfg.travelApiUrl) return fail(res, 503, 'TRAVEL_OFF', 'Travel isn’t connected yet. Set TRAVEL_API_URL on the UniHub server.');
+    const target = new URL(cfg.travelApiUrl);
+    const lib = target.protocol === 'https:' ? https : http;
+    const headers = { ...req.headers, host: target.host, 'x-forwarded-for': clientIp(req), 'x-forwarded-proto': req.headers['x-forwarded-proto'] || 'http' };
+    delete headers.cookie; // UniHub's session cookie is not Travel's business
+    const up = lib.request({ protocol: target.protocol, hostname: target.hostname, port: target.port || (target.protocol === 'https:' ? 443 : 80), method: req.method, path: req.url, headers, timeout: 60000 }, (r) => {
+      res.writeHead(r.statusCode || 502, r.headers);
+      r.pipe(res);
+    });
+    up.on('timeout', () => up.destroy(new Error('timeout')));
+    up.on('error', () => { if (!res.headersSent) fail(res, 502, 'TRAVEL_DOWN', 'Travel is waking up or unreachable. Try again in a minute.'); else res.end(); });
+    req.pipe(up);
+  }
+
+  // Socket.IO websockets for Travel's live chat and group updates.
+  server.on('upgrade', (req, socket, head) => {
+    if (!cfg.travelApiUrl || !req.url.startsWith('/socket.io/')) { socket.destroy(); return; }
+    const target = new URL(cfg.travelApiUrl);
+    const secure = target.protocol === 'https:';
+    const port = Number(target.port) || (secure ? 443 : 80);
+    const upstream = secure ? tls.connect({ host: target.hostname, port, servername: target.hostname }) : net.connect({ host: target.hostname, port });
+    upstream.once(secure ? 'secureConnect' : 'connect', () => {
+      const lines = [`${req.method} ${req.url} HTTP/1.1`];
+      for (const [k, v] of Object.entries(req.headers)) if (k !== 'host' && k !== 'cookie') lines.push(`${k}: ${v}`);
+      lines.push(`host: ${target.host}`, '', '');
+      upstream.write(lines.join('\r\n'));
+      if (head && head.length) upstream.write(head);
+      upstream.pipe(socket); socket.pipe(upstream);
+    });
+    const close = () => { socket.destroy(); upstream.destroy(); };
+    upstream.on('error', close); socket.on('error', close);
+  });
+
   setInterval(() => store.pruneCodes(), 10 * 60e3).unref();
   return { server, store, cfg };
 }

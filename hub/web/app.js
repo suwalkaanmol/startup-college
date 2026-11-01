@@ -362,6 +362,21 @@ $('#delete-form').addEventListener('submit', async (e) => {
 });
 $('#del-confirm').addEventListener('input', () => { $('#del-error').textContent = ''; });
 
+// Cards whose server isn't set up yet say so, so nobody lands on an error.
+async function markConnections() {
+  let st;
+  try { st = await fetch('/api/hub/status').then((r) => r.json()); } catch { return; }
+  ['xerox', 'food', 'travel', 'pg'].forEach((k) => {
+    const t = $(`.tile[data-open="${k}"]`); if (!t) return;
+    let b = $('.tile-badge', t);
+    if (st[k] === false) {
+      if (!b) { b = document.createElement('span'); b.className = 'tile-badge'; t.appendChild(b); }
+      b.textContent = 'Not connected yet';
+      t.setAttribute('aria-description', 'This section’s server isn’t set up yet, so it can’t load data.');
+    } else if (b) b.remove();
+  });
+}
+
 /* ---------------- routing ---------------- */
 function route() {
   if (!me) { show('screen-auth'); $('#email').focus(); return; }
@@ -369,7 +384,7 @@ function route() {
     fillForm($('#onboard-form'), me); $('#ob-email').value = me.email;
     show('screen-onboard'); $('#ob-name').focus(); return;
   }
-  greet(); show('screen-main'); loadOrders();
+  greet(); show('screen-main'); loadOrders(); markConnections();
   const note = store.get('hub_last_note');
   if (note) { $('#open-note').textContent = note; store.del('hub_last_note'); }
 }

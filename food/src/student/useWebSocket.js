@@ -24,7 +24,7 @@ export function getWebSocketUrl(endpoint) {
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
 
   if (typeof window !== 'undefined') {
-    if ((window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') && window.location.port !== '') {
+    if ((window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') && window.location.port === '5173') {
       return `ws://127.0.0.1:8000${cleanEndpoint}`;
     }
   }
