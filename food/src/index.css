@@ -1,0 +1,328 @@
+/* ============================================================================
+   UNIHUB CANTEEN — GLOBAL THEME STYLESHEET
+   Light & Dark Mode exact color themes, CSS custom properties, and base rules
+   ============================================================================ */
+
+:root,
+:root[data-theme="light"],
+[data-theme="light"] {
+  /* LIGHT MODE EXACT SPECIFICATION */
+  --color-page-bg: #f5f5f5;
+  --color-panel-bg: #e2e8f0;
+  --color-card-bg: #ffffff;
+  --color-card-soft: #f8fafc;
+  --color-border: #e2e8f0;
+  --color-text-primary: #2d3748;
+  --color-text-muted: #718096;
+  --color-disabled-bg: #edf2f7;
+  --color-accent: #6366f1;
+  --color-btn-info: #3182ce;
+  --color-btn-danger: #e53e3e;
+  --gradient-brand: linear-gradient(135deg, #667eea, #764ba2);
+  --gradient-btn: linear-gradient(135deg, #6366f1, #8b5cf6);
+
+  /* Status Colors */
+  --status-pending-bg: #fef3c7;
+  --status-pending-text: #92400e;
+  --status-preparing-bg: #e0e7ff;
+  --status-preparing-text: #3730a3;
+  --status-ready-bg: #d1fae5;
+  --status-ready-text: #065f46;
+  --status-collected-bg: #f1f5f9;
+  --status-collected-text: #475569;
+  --status-cancelled-bg: #fee2e2;
+  --status-cancelled-text: #991b1b;
+
+  --badge-veg-bg: #f0fdf4;
+  --badge-veg-text: #16a34a;
+  --badge-veg-border: #bbf7d0;
+
+  /* Aliases for backwards compatibility */
+  --primary: var(--color-accent);
+  --primary-hover: #4f46e5;
+  --primary-light: #eef2ff;
+  --primary-border: #c7d2fe;
+  --bg-main: var(--color-page-bg);
+  --bg-card: var(--color-card-bg);
+  --border-subtle: var(--color-border);
+  --border-strong: #cbd5e1;
+  --text-main: var(--color-text-primary);
+  --text-muted: var(--color-text-muted);
+  --text-light: #a0aec0;
+  --btn-info: var(--color-btn-info);
+  --btn-danger: var(--color-btn-danger);
+
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  /* Safe Area Insets */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
+:root[data-theme="dark"],
+[data-theme="dark"] {
+  /* DARK MODE EXACT SPECIFICATION */
+  --color-page-bg: #0f1220;
+  --color-panel-bg: #161a2e;
+  --color-card-bg: #1c2038;
+  --color-card-soft: #232845;
+  --color-border: #2f3556;
+  --color-text-primary: #e8eaf6;
+  --color-text-muted: #a0a8c8;
+  --color-disabled-bg: #1a1e33;
+  --color-accent: #818cf8;
+  --color-btn-info: #4299e1;
+  --color-btn-danger: #f56565;
+  --gradient-brand: linear-gradient(135deg, #5a6fd6, #6a3f94);
+  --gradient-btn: linear-gradient(135deg, #6366f1, #8b5cf6);
+
+  /* Status Colors */
+  --status-pending-bg: #2e2308;
+  --status-pending-text: #fcd34d;
+  --status-preparing-bg: #1e1b4b;
+  --status-preparing-text: #a5b4fc;
+  --status-ready-bg: #064e3b;
+  --status-ready-text: #6ee7b7;
+  --status-collected-bg: #1e293b;
+  --status-collected-text: #94a3b8;
+  --status-cancelled-bg: #450a0a;
+  --status-cancelled-text: #fca5a5;
+
+  --badge-veg-bg: #052e16;
+  --badge-veg-text: #4ade80;
+  --badge-veg-border: #166534;
+
+  /* Aliases for backwards compatibility */
+  --primary: var(--color-accent);
+  --primary-hover: #a5b4fc;
+  --primary-light: #232845;
+  --primary-border: #3b426f;
+  --bg-main: var(--color-page-bg);
+  --bg-card: var(--color-card-bg);
+  --border-subtle: var(--color-border);
+  --border-strong: #3f4773;
+  --text-main: var(--color-text-primary);
+  --text-muted: var(--color-text-muted);
+  --text-light: #7b84a9;
+  --btn-info: var(--color-btn-info);
+  --btn-danger: var(--color-btn-danger);
+
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.55);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.65);
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background-color: var(--color-page-bg);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.25s ease, color 0.25s ease;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  touch-action: manipulation;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px; /* Prevents auto-zoom on iOS Safari */
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================================
+   SVG ICON SAFETY & SIZING RULES
+   Ensures SVGs never expand without bounds or produce oversized rings
+   ============================================================================ */
+svg {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.w-3 { width: 0.75rem !important; }
+.h-3 { height: 0.75rem !important; }
+.w-3\.5, .w-3-5 { width: 0.875rem !important; }
+.h-3\.5, .h-3-5 { height: 0.875rem !important; }
+.w-4 { width: 1rem !important; }
+.h-4 { height: 1rem !important; }
+.w-5 { width: 1.25rem !important; }
+.h-5 { height: 1.25rem !important; }
+.w-6 { width: 1.5rem !important; }
+.h-6 { height: 1.5rem !important; }
+.w-8 { width: 2rem !important; }
+.h-8 { height: 2rem !important; }
+
+/* Text color helpers */
+.text-gray-400 { color: var(--color-text-muted) !important; }
+.text-gray-500 { color: var(--color-text-muted) !important; }
+.text-gray-700 { color: var(--color-text-primary) !important; }
+.text-orange-400 { color: var(--color-accent) !important; }
+.text-orange-600 { color: var(--color-accent) !important; }
+.text-red-600 { color: var(--color-btn-danger) !important; }
+.text-emerald-600 { color: #16a34a !important; }
+.text-amber-600 { color: #d97706 !important; }
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideDrawer {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ============================================================================
+   CAMPUS HUB NAVIGATION STRIP & VIEW SWITCHER
+   ============================================================================ */
+.campus-nav-strip {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background-color: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.5rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.campus-hub-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #38bdf8;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 0.3rem 0.6rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.campus-hub-link:hover {
+  color: #7dd3fc;
+  background-color: rgba(56, 189, 248, 0.12);
+}
+
+.campus-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.nav-mode-badge {
+  font-size: 0.725rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.nav-mode-badge.student {
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.nav-mode-badge.owner {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.nav-switch-btn {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.3rem 0.75rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.nav-switch-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
