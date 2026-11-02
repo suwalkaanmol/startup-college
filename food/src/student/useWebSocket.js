@@ -90,17 +90,15 @@ export function useWebSocket(endpoint, onMessage) {
         }
       };
 
-      ws.onerror = (err) => {
-        console.warn(`[WS] Error on ${url}:`, err);
-      };
-
       ws.onclose = (event) => {
         setIsConnected(false);
-        console.log(`[WS] Closed connection to ${url} (code=${event.code}, reason=${event.reason || 'none'})`);
+        if (import.meta.env.DEV) {
+          console.warn(`[WS] Closed connection to ${url} (code=${event.code}, reason=${event.reason || 'none'})`);
+        }
         if (heartbeatIntervalRef.current) clearInterval(heartbeatIntervalRef.current);
 
-        // Exponential backoff reconnect: 1s, 2s, 4s, 8s (max 10s)
-        const delay = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 10000);
+        // Exponential backoff avoids hammering an unavailable backend (max 60s).
+        const delay = Math.min(1000 * Math.pow(2, Math.min(reconnectAttemptRef.current, 6)), 60000);
         reconnectAttemptRef.current += 1;
 
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);

@@ -18,8 +18,6 @@ export function MyOrdersModal({
   const [tokenSearchLoading, setTokenSearchLoading] = useState(false);
   const [tokenSearchError, setTokenSearchError] = useState(null);
 
-  if (!isOpen) return null;
-
   const handleTrackByToken = async (e) => {
     e.preventDefault();
     if (!searchToken.trim()) return;
@@ -75,6 +73,8 @@ export function MyOrdersModal({
     });
     return result;
   }, [savedOrders]);
+
+  if (!isOpen) return null;
 
   // Group orders into authoritative categories
   const activeOrders = uniqueOrders.filter((o) => {

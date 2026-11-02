@@ -215,7 +215,29 @@ export default function StudentApp({ onOpenStaffLogin }) {
       }
     }
   }, [activeCanteen]);
-  useWebSocket(canteenWsEndpoint, handleCanteenWsMessage);
+  const { isConnected: isCanteenWsConnected } = useWebSocket(canteenWsEndpoint, handleCanteenWsMessage);
+
+  // Keep stock and menu data fresh when live WebSocket updates are unavailable.
+  useEffect(() => {
+    if (!activeCanteen || isCanteenWsConnected) return;
+
+    let isCancelled = false;
+    const canteenId = activeCanteen.id;
+    const refreshMenu = async () => {
+      try {
+        const items = await fetchCanteenMenu(canteenId);
+        if (!isCancelled) setMenuItems(items);
+      } catch (err) {
+        // Keep showing the last successful menu while the API is unavailable.
+      }
+    };
+
+    const intervalId = setInterval(refreshMenu, 30000);
+    return () => {
+      isCancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [activeCanteen?.id, isCanteenWsConnected]);
 
   // 1.2 WebSocket Live Updates: Order Status Updates
   // Track all saved orders in this device session, plus any actively inspected modal
