@@ -12,6 +12,7 @@ import { sign, verify } from './lib/jwt.js';
 import { sendMail } from './lib/mailer.js';
 import { createStore } from './lib/store.js';
 import { createPlaces } from './lib/places.js';
+import { normalizeCode } from './lib/receipt.js';
 import { createLive } from './lib/live.js';
 import { HttpError, send, fail, readJson, cookies, clientIp, limiter } from './lib/http.js';
 import { seed } from './seed.js';
@@ -94,7 +95,7 @@ const MIME = {
   '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
   '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.txt': 'text/plain; charset=utf-8',
 };
-const PUBLIC_TOP = new Set(['', 'index.html', 'sw.js', 'manifest.webmanifest', 'food', 'travel', 'xerox', 'pg', 'nav', 'admin', 'hub']);
+const PUBLIC_TOP = new Set(['', 'index.html', 'sw.js', 'manifest.webmanifest', 'food', 'travel', 'xerox', 'pg', 'nav', 'admin', 'hub', 'verify']);
 const BLOCKED = [
   /(^|\/)\./, /node_modules/, /\.(md|bat|sql|env|lock|log|map)$/i, /(^|\/)package(-lock)?\.json$/i,
   /^\/hub\/(?!web\/)/,
@@ -233,6 +234,18 @@ export function createApp(cfg = makeConfig(), deps = {}) {
   r.get('/api/hub/orders', 'student', ({ user }) => {
     const all = modules.flatMap((m) => m.studentOrders?.(user.id) || []);
     return { orders: all.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 60) };
+  });
+
+  // Anyone (a canteen, a shop, the student) can check that a receipt slip is genuine.
+  const verifyLimit = limiter(60e3, 30);
+  r.get('/api/receipts/verify', null, ({ req, url }) => {
+    if (!verifyLimit(clientIp(req))) throw new HttpError(429, 'RATE_LIMIT', 'Too many checks. Wait a minute and try again.');
+    const code = normalizeCode(url.searchParams.get('code'));
+    if (!/^[0-9A-Z]{5}-[0-9A-Z]{5}$/.test(code)) throw new HttpError(400, 'INVALID', 'Enter the 10-character code printed on the slip, like 7K2QF-9XM4B.');
+    const hit = modules.map((m) => m.findReceipt?.(code)).find(Boolean);
+    if (!hit) return { genuine: false, code };
+    const { o } = hit;
+    return { genuine: true, code, kind: hit.kind, place: hit.place, token: o.token, at: o.createdAt, total: o.total, status: o.status, paid: o.payment?.status || '', ref: o.payment?.ref || '', lines: hit.lines };
   });
 
   // Live updates: GET /api/live?t=topic1,topic2 (each topic checked against who is asking)

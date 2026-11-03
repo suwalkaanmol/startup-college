@@ -11,6 +11,7 @@ const KIND = { pdf: 'PDF', docx: 'Word', pptx: 'PowerPoint', image: 'Image' };
 const optLine = (f) => `${f.ranges.map((r) => (r.from === r.to ? `page ${r.from}` : `pages ${r.from}–${r.to}`)).join(', ')} · ${f.copies} cop${f.copies === 1 ? 'y' : 'ies'} · ${f.color === 'bw' ? 'black & white' : 'colour'} · ${f.size} · ${f.sides === 'double' ? 'front & back' : 'one side'}${f.nup > 1 ? ` · ${f.nup}-in-1 ${f.arrangement === 'vertical' ? 'top to bottom' : 'side by side'}` : ''}${f.binding !== 'none' ? ` · ${f.binding}` : ''}`;
 
 async function start(staff) {
+  actions.insertAdjacentHTML('beforeend', '<a class="btn ghost sm" href="../verify/index.html">Check a slip</a>');
   staffMenu(actions, staff);
   const app = $('#app'); const isAdmin = staff.role === 'admin';
   let sid = isAdmin ? (new URLSearchParams(location.search).get('shop') || 'prp') : staff.place;

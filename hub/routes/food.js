@@ -2,6 +2,7 @@
 // order with a pickup time, pay the canteen directly and collect with a token. Owners run the board, menu and history.
 import { HttpError, readJson, need, today } from '../lib/http.js';
 import { takePayment, refund } from '../lib/pay.js';
+import { receiptCode } from '../lib/receipt.js';
 
 const FLOW = { PLACED: ['READY', 'CANCELLED'], READY: ['COLLECTED'], COLLECTED: [], CANCELLED: [] };
 const ACTIVE = ['PLACED', 'READY'];
@@ -19,7 +20,7 @@ function istTime(hhmm, now = new Date()) {
   return new Date(base.getTime() + (h * 60 + m) * MIN);
 }
 
-export default function food(r, { store, places, live }) {
+export default function food(r, { store, places, live, cfg }) {
   const db = (cid) => places.get('food', cid);
   const canteen = (id) => { const c = store.get('canteens', id); if (!c) throw new HttpError(404, 'NOT_FOUND', 'That canteen doesn’t exist.'); return c; };
   const canteenOut = (c) => ({ id: c.id, name: c.name, place: c.place, open: c.open, upi: c.upi || '', dishes: db(c.id).count('menu') });
@@ -37,7 +38,7 @@ export default function food(r, { store, places, live }) {
   const studentView = (o) => {
     const expired = o.status === 'COLLECTED' && o.collectedAt && Date.now() - new Date(o.collectedAt).getTime() > TOKEN_VALID_HOURS * 3600e3;
     const canCancel = o.status === 'PLACED' && Date.now() - new Date(o.createdAt).getTime() < CANCEL_MINUTES * MIN;
-    return { ...o, expired, canCancel, validUntil: o.collectedAt ? new Date(new Date(o.collectedAt).getTime() + TOKEN_VALID_HOURS * 3600e3).toISOString() : null };
+    return { ...o, expired, canCancel, receipt: receiptCode(cfg.jwtSecret, 'food', o.canteenId, o), placeLine: store.get('canteens', o.canteenId)?.place || '', validUntil: o.collectedAt ? new Date(new Date(o.collectedAt).getTime() + TOKEN_VALID_HOURS * 3600e3).toISOString() : null };
   };
   const pub = (o) => {
     live.publish(`food:c:${o.canteenId}`, { id: o.id, status: o.status, token: o.token });
@@ -234,6 +235,8 @@ export default function food(r, { store, places, live }) {
       if ((m = t.match(/^food:menu:(.+)$/))) return Boolean(user || staff);
       return false;
     },
+    // For /verify: finds the order a slip's code belongs to.
+    findReceipt: (code) => { for (const c of store.list('canteens')) for (const o of db(c.id).list('orders')) if (receiptCode(cfg.jwtSecret, 'food', c.id, o) === code) return { kind: 'Food', place: c.name, o, lines: o.items.map((i) => `${i.qty}× ${i.name}`) }; return null; },
     studentOrders: (uid) => mine(uid).map((o) => ({ source: 'food', id: o.id, title: o.canteenName, token: o.token, status: o.status, amount: o.total, at: o.createdAt, detail: o.items.map((i) => `${i.qty}× ${i.name}`).join(', ') })),
     forgetStudent() { /* orders are kept for the canteen's accounts */ },
     count: () => store.list('canteens').reduce((n, c) => n + db(c.id).count('orders'), 0),

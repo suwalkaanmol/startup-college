@@ -123,6 +123,12 @@ test('food: four menus, compare, pickup time, daily stock, separate databases', 
   const h = (await dc('/api/food/staff/history')).body;
   assert.equal(h.totals.orders, 1); assert.equal(h.items.find((i) => i.name === 'Chicken Biryani').qty, 1);
   assert.ok((await s('/api/hub/orders')).body.orders.some((x) => x.token === 'D1'));
+  // The slip's verification code checks out; an altered one doesn't.
+  assert.match(mine.receipt, /^[0-9A-Z]{5}-[0-9A-Z]{5}$/);
+  const v = (await client()(`/api/receipts/verify?code=${mine.receipt.toLowerCase()}`)).body;
+  assert.equal(v.genuine, true); assert.equal(v.token, 'D1'); assert.equal(v.total, 227);
+  const forged = mine.receipt.slice(0, -1) + (mine.receipt.endsWith('0') ? '1' : '0');
+  assert.equal((await client()(`/api/receipts/verify?code=${forged}`)).body.genuine, false);
 });
 
 test('xerox: Word and image pages, ranges, N-in-1, A3, binding, chat, separate databases', async () => {

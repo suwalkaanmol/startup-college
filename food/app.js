@@ -199,6 +199,12 @@ function showTicket(o) {
     rows: [['Ordered at', clock(o.createdAt)], ['Collect at', clock(o.pickupAt)], ['Estimated prep time (longest item)', `~${o.prepMins} min`], ['Order type', o.mode === 'dinein' ? 'Dine-in' : 'Take-away'], ['Status', statusLine(o)], ['Paid to', `${o.canteenName}${o.payment?.ref ? ` · UPI ref ${o.payment.ref}` : ''}`]],
     lines: o.items.map((i) => [`${i.name} × ${i.qty}`, i.price * i.qty]),
     note: o.note ? `Note: ${o.note}` : '',
+    code: o.receipt,
+    slip: {
+      kind: 'food', placeLine: o.placeLine, payment: o.payment, status: o.status === 'CANCELLED' ? 'Cancelled · refunded' : o.status === 'COLLECTED' ? 'Collected' : o.status === 'READY' ? 'Ready to collect' : 'Paid · being prepared',
+      rows: [['Date', new Date(o.createdAt).toLocaleDateString('en-IN')], ['Ordered at', clock(o.createdAt)], ['Collect at', clock(o.pickupAt)], ['Prep time', `~${o.prepMins} min`], ['Order type', o.mode === 'dinein' ? 'Dine-in' : 'Take-away'], ['Student', `${user.name.split(' ')[0]} · ${user.regNo}`]],
+      lines: o.items.map((i) => [`${i.name} × ${i.qty}`, i.price * i.qty]),
+    },
   });
 }
 function ticketCard(o) {

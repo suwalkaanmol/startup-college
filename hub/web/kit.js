@@ -223,7 +223,19 @@ export const clock = hm;
 
 // A live invoice: the clock ticks and the watermark moves, so a screenshot can't pass for a real token at the counter.
 // rows: [[label, value], ...]; lines: [[text, amount], ...]
-export function liveInvoice({ title = 'Invoice', token, place, at, rows = [], lines = [], total, paid = true, expired = false, note = '' }) {
+// Saves a file. Inside claude.ai the viewer confirms the save; elsewhere it is a normal browser download.
+export async function saveFile(filename, blob) {
+  if (window.claude?.use) {
+    const dl = await window.claude.use('downloads').catch(() => null);
+    if (dl) { try { await dl.save({ filename, data: blob }); return true; } catch (e) { if (e?.code === 'declined') return false; } }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  return true;
+}
+
+// slip: data for the downloadable receipt slip (see slip.js); code: the signed verification code.
+export function liveInvoice({ title = 'Invoice', token, place, at, rows = [], lines = [], total, paid = true, expired = false, note = '', code = '', slip = null }) {
   const s = sheet({
     title,
     body: `<div class="inv ${expired ? 'expired' : ''}" aria-live="off">
@@ -234,11 +246,23 @@ export function liveInvoice({ title = 'Invoice', token, place, at, rows = [], li
       <ul class="inv-lines">${lines.map(([t, a]) => `<li><span>${esc(t)}</span><b class="num">${money(a)}</b></li>`).join('')}</ul>
       <div class="inv-total"><span>${paid ? 'Paid' : 'Total'}</span><b class="num">${money(total)}</b></div>
       ${note ? `<p class="muted small">${esc(note)}</p>` : ''}
+      ${code ? `<div class="inv-code"><span>Verification code</span><b>${esc(code)}</b></div>` : ''}
       <p class="inv-live">${expired ? 'Token expired' : '<span class="dot" aria-hidden="true"></span>LIVE <span data-clock></span> · valid today only'}</p>
     </div>`,
-    foot: '<button class="btn primary block" data-close>Close</button>',
+    foot: `${slip ? '<button class="btn primary block" id="inv-dl">⬇ Download slip</button>' : ''}<button class="btn ${slip ? 'ghost' : 'primary'} block" data-close>Close</button>`,
   });
   s.el.querySelector('.sheet-foot [data-close]').addEventListener('click', s.close);
+  s.el.querySelector('#inv-dl')?.addEventListener('click', async (e) => {
+    const b = e.target; b.disabled = true; b.textContent = 'Making your slip…';
+    try {
+      const { drawSlip } = await import('./slip.js');
+      const canvas = drawSlip({ ...slip, token, place, at, total, code, verifyUrl: new URL('../../verify/index.html', import.meta.url).href.replace(/^https?:\/\//, '') });
+      const blob = await new Promise((ok) => canvas.toBlob(ok, 'image/png'));
+      const name = `UniHub-${place}-${token}-${new Date(new Date(at).getTime() + 5.5 * 3600e3).toISOString().slice(0, 10)}.png`.replace(/[^\w.-]+/g, '-').replace(/-+/g, '-');
+      toast((await saveFile(name, blob)) ? 'Slip downloaded.' : 'Download cancelled.');
+    } catch (x) { toast(`Couldn’t make the slip: ${x.message || x.code}`); }
+    b.disabled = false; b.textContent = '⬇ Download slip';
+  });
   const tick = () => { const c = s.el.querySelector('[data-clock]'); if (!c || !document.body.contains(c)) { clearInterval(t); return; } c.textContent = new Date().toLocaleTimeString('en-IN', { hour12: false }); };
   const t = setInterval(tick, 1000); tick();
   return s;

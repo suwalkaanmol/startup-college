@@ -6,6 +6,7 @@ const actions = bar({ section: 'food', title: 'Canteen owner', back: 'index.html
 staffGate({ expect: 'canteen', title: 'Owner sign in', onReady: start });
 
 async function start(staff) {
+  actions.insertAdjacentHTML('beforeend', '<a class="btn ghost sm" href="../verify/index.html">Check a slip</a>');
   staffMenu(actions, staff);
   const app = $('#app');
   const isAdmin = staff.role === 'admin';

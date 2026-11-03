@@ -6,6 +6,7 @@ import crypto from 'node:crypto';
 import { HttpError, readJson, readBody, need, today } from '../lib/http.js';
 import { takePayment, refund } from '../lib/pay.js';
 import { readZipEntry } from '../lib/zip.js';
+import { receiptCode } from '../lib/receipt.js';
 
 const FLOW = { QUEUED: ['PRINTING', 'READY', 'CANCELLED'], PRINTING: ['READY', 'CANCELLED'], READY: ['COLLECTED'], COLLECTED: [], CANCELLED: [] };
 const ACTIVE = ['QUEUED', 'PRINTING', 'READY'];
@@ -61,7 +62,8 @@ export function priceFile(f, rates) {
   return { selected, sheets, cost: sheets * rates[key] + binding * f.copies };
 }
 
-export default function xerox(r, { store, places, live }) {
+export default function xerox(r, { store, places, live, cfg }) {
+  const withReceipt = (o) => ({ ...o, receipt: receiptCode(cfg.jwtSecret, 'xerox', o.shopId, o) });
   const db = (sid) => places.get('xerox', sid);
   const filesDir = (sid) => { const d = places.dir('xerox', sid) + '-uploads'; fs.mkdirSync(d, { recursive: true }); return d; };
   const shop = (id) => { const s = store.get('shops', id); if (!s) throw new HttpError(404, 'NOT_FOUND', 'That shop doesn’t exist.'); return s; };
@@ -160,11 +162,11 @@ export default function xerox(r, { store, places, live }) {
       files, total, token: `${s.prefix}${d.next(`token:${day}`)}`, day, status: 'QUEUED', payment, note: String(b.note || '').trim().slice(0, 200),
     });
     pub(o);
-    return { order: o };
+    return { order: withReceipt(o) };
   });
 
   const mine = (uid) => store.list('shops').flatMap((s) => db(s.id).list('orders', (o) => o.studentId === uid));
-  r.get('/api/xerox/orders/mine', 'student', ({ user }) => ({ orders: mine(user.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 60) }));
+  r.get('/api/xerox/orders/mine', 'student', ({ user }) => ({ orders: mine(user.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 60).map(withReceipt) }));
 
   r.post('/api/xerox/orders/:id/cancel', 'student', ({ params, user }) => {
     const o = mine(user.id).find((x) => x.id === params.id);
@@ -273,6 +275,7 @@ export default function xerox(r, { store, places, live }) {
       if ((m = t.match(/^xerox:s:(.+)$/))) return staff && (staff.role === 'admin' || (staff.role === 'xerox' && staff.place === m[1]));
       return false;
     },
+    findReceipt: (code) => { for (const s of store.list('shops')) for (const o of db(s.id).list('orders')) if (receiptCode(cfg.jwtSecret, 'xerox', s.id, o) === code) return { kind: 'Xerox', place: s.name, o, lines: o.files.map((f) => `${f.name} (${f.sheets} sheets)`) }; return null; },
     studentOrders: (uid) => mine(uid).map((o) => ({ source: 'xerox', id: o.id, title: o.shopName, token: o.token, status: o.status, amount: o.total, at: o.createdAt, detail: o.files.map((i) => i.name).join(', ') })),
     forgetStudent(uid) {
       for (const s of store.list('shops')) {

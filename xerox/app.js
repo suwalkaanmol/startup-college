@@ -226,6 +226,12 @@ function showTicket(o) {
     title: 'Invoice', token: o.token, place: o.shopName, at: o.createdAt, total: o.total, expired: ['COLLECTED', 'CANCELLED'].includes(o.status),
     rows: [['Date', new Date(o.createdAt).toLocaleDateString('en-IN')], ['Time', clock(o.createdAt)], ['Status', statusLine(o)], ['Paid to', `${o.shopName}${o.payment?.ref ? ` · UPI ref ${o.payment.ref}` : ''}`]],
     lines: o.files.map((f) => [`${f.name} (${optLine(f)})`, f.cost]), note: o.note ? `Note: ${o.note}` : '',
+    code: o.receipt,
+    slip: {
+      kind: 'xerox', placeLine: 'Xerox & printing', payment: o.payment, status: o.status === 'CANCELLED' ? 'Cancelled · refunded' : o.status === 'COLLECTED' ? 'Collected' : o.status === 'READY' ? 'Ready to collect' : 'Paid · in the print queue',
+      rows: [['Date', new Date(o.createdAt).toLocaleDateString('en-IN')], ['Time', clock(o.createdAt)], ['Sheets', String(o.files.reduce((n, f) => n + f.sheets, 0))], ['Student', `${user.name.split(' ')[0]} · ${user.regNo}`]],
+      lines: o.files.map((f) => [`${f.name} — ${optLine(f)}`, f.cost]),
+    },
   });
 }
 function renderActive() {
