@@ -3,17 +3,31 @@ import { HttpError, readJson, need, clientIp, limiter } from '../lib/http.js';
 import { hashPassword, checkPassword, passwordProblem, randomPassword } from '../lib/password.js';
 import { AMENITIES } from './pg.js';
 
-export default function staffRoutes(r, { store, setStaffSession, clearStaffSession }) {
+export default function staffRoutes(r, { store, places, setStaffSession, clearStaffSession }) {
   const tries = limiter(15 * 60e3, 10);
   const out = (s) => ({ id: s.id, username: s.username, name: s.name, role: s.role, place: s.place, placeName: placeName(s), createdAt: s.createdAt });
   const placeName = (s) => (s.role === 'canteen' ? store.get('canteens', s.place)?.name : s.role === 'xerox' ? store.get('shops', s.place)?.name : 'Everything') || s.place;
 
+  // The canteens and shops to pick from on the owner sign-in screens (names only).
+  r.get('/api/staff/places', null, () => ({
+    canteen: store.list('canteens').map((c) => ({ id: c.id, name: c.name })).sort((a, b) => a.name.localeCompare(b.name)),
+    xerox: store.list('shops').map((s) => ({ id: s.id, name: s.name, grp: s.grp })),
+  }));
+
+  // Owners sign in by picking their canteen or shop and typing its password; the admin uses a staff ID.
   r.post('/api/staff/login', null, async ({ req, res }) => {
     if (!tries(clientIp(req))) throw new HttpError(429, 'RATE_LIMIT', 'Too many sign-in attempts. Wait 15 minutes and try again.');
     const b = await readJson(req);
-    const username = String(b.username || '').trim().toLowerCase();
-    const s = store.list('staff', (x) => x.username === username)[0];
-    if (!s || !checkPassword(b.password, s.hash)) throw new HttpError(401, 'WRONG', 'That staff ID or password isn’t right.');
+    let s;
+    if (b.place) {
+      const role = need.oneOf(b.expect, 'Kind of place', ['canteen', 'xerox']);
+      s = store.list('staff', (x) => x.role === role && x.place === b.place).find((x) => checkPassword(b.password, x.hash));
+      if (!s) throw new HttpError(401, 'WRONG', `That password isn’t right for ${role === 'canteen' ? store.get('canteens', b.place)?.name || 'this canteen' : store.get('shops', b.place)?.name || 'this shop'}.`);
+    } else {
+      const username = String(b.username || '').trim().toLowerCase();
+      s = store.list('staff', (x) => x.username === username)[0];
+      if (!s || !checkPassword(b.password, s.hash)) throw new HttpError(401, 'WRONG', 'That staff ID or password isn’t right.');
+    }
     if (b.expect && b.expect !== s.role && s.role !== 'admin') throw new HttpError(403, 'WRONG_ROLE', b.expect === 'canteen' ? 'This is a Xerox shop login. Use it on the Xerox staff page.' : 'This is a canteen login. Use it on the Food staff page.');
     setStaffSession(req, res, s);
     return { staff: out(s) };
@@ -32,7 +46,8 @@ export default function staffRoutes(r, { store, setStaffSession, clearStaffSessi
     counts: {
       students: store.userCount(),
       staff: store.count('staff'), canteens: store.count('canteens'), shops: store.count('shops'),
-      foodOrders: store.count('foodOrders'), xeroxOrders: store.count('xeroxOrders'), rides: store.count('rides'),
+      foodOrders: store.list('canteens').reduce((n, c) => n + places.get('food', c.id).count('orders'), 0),
+      xeroxOrders: store.list('shops').reduce((n, x) => n + places.get('xerox', x.id).count('orders'), 0), rides: store.count('rides'),
       pgListings: store.count('pgListings'), enquiries: store.list('pgEnquiries', (e) => e.status === 'NEW').length,
     },
     places: { canteen: store.list('canteens').map((c) => ({ id: c.id, name: c.name })), xerox: store.list('shops').map((s) => ({ id: s.id, name: s.name })) },
@@ -74,7 +89,7 @@ export default function staffRoutes(r, { store, setStaffSession, clearStaffSessi
     const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     if (!id || store.get('canteens', id)) throw new HttpError(409, 'TAKEN', 'A canteen with that name already exists.');
     const prefix = (String(b.prefix || name[0]).toUpperCase().match(/[A-Z]/) || ['C'])[0];
-    return { canteen: store.put('canteens', { id, name, place: String(b.place || '').trim().slice(0, 60), prefix, open: true, sampleMenu: false }) };
+    return { canteen: store.put('canteens', { id, name, place: String(b.place || '').trim().slice(0, 60), prefix, open: true, upi: '' }) };
   });
 
   const listingInput = (b) => ({

@@ -157,19 +157,45 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--u
 .hero .seg button { color: rgba(255,255,255,.88); }
 .hero .seg button[aria-pressed="true"] { color: var(--u-800); background: #fff; }
 
-/* Pay by phone */
-.pay { display: grid; gap: 14px; }
-.pay-amt { display: grid; justify-items: center; gap: 2px; padding: 16px; border-radius: 16px; background: var(--uh-surface-2); }
-.pay-amt b { font: 700 34px/1.1 var(--f-display); color: var(--uh-text); }
+/* Pay with UPI: a UPI-app look (purple), whatever section it is opened from */
+.pay { display: grid; gap: 14px; --upi: #5f259f; --upi-2: #7b3fc4; }
+.upi-card { border-radius: 18px; padding: 18px; color: #fff; background: linear-gradient(140deg, var(--upi) 0%, var(--upi-2) 100%); display: grid; gap: 14px; box-shadow: 0 10px 24px rgba(95, 37, 159, .3); }
+.upi-to { display: flex; gap: 12px; align-items: center; }
+.upi-to b { display: block; font: 600 16px/1.2 var(--f-display); }
+.upi-to span { font-size: 13px; color: rgba(255,255,255,.8); }
+.upi-av { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: #fff; color: var(--upi); font: 700 18px/1 var(--f-display); flex: none; }
+.upi-amt { font: 700 38px/1 var(--f-display); letter-spacing: -0.02em; }
+.btn.upi { background: linear-gradient(135deg, var(--upi) 0%, var(--upi-2) 100%); color: #fff; box-shadow: 0 6px 16px rgba(95, 37, 159, .3); }
 .pay-ph { display: flex; align-items: stretch; border: 1.5px solid var(--uh-line); border-radius: 11px; overflow: hidden; background: var(--uh-surface); }
 .pay-ph span { display: grid; place-items: center; padding: 0 12px; background: var(--uh-surface-2); color: var(--uh-muted); font-weight: 600; }
 .pay-ph input { border: 0; border-radius: 0; }
-.pay-otp { text-align: center; font: 600 24px/1 var(--f-display) !important; letter-spacing: .4em; }
+.otp-wrap { position: relative; }
+.pay-otp { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: text; z-index: 1; }
+.otp-boxes { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.otp-boxes span { height: 50px; border-radius: 12px; border: 1.5px solid var(--uh-line); background: var(--uh-surface); display: grid; place-items: center; font: 700 26px/1 var(--f-display); color: var(--uh-text); }
+.otp-wrap:focus-within .otp-boxes span.on { border-color: #7b3fc4; box-shadow: 0 0 0 3px rgba(123, 63, 196, .2); }
 .link { border: 0; background: none; color: var(--uh-accent); font: inherit; font-weight: 600; cursor: pointer; padding: 0; text-decoration: underline; }
+.link.small { font-size: 13px; display: block; margin-inline: auto; }
 .pay-done { display: grid; justify-items: center; gap: 6px; padding: 18px 0 6px; text-align: center; }
 .pay-tick { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--uh-ok); color: #fff; font: 700 32px/1 var(--f-display); animation: pay-pop .35s ease-out; }
 @keyframes pay-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .pay-tick { animation: none; } }
+
+/* Live invoice: ticking clock and a moving watermark, so a screenshot is easy to tell apart */
+.inv { position: relative; overflow: hidden; display: grid; gap: 10px; padding: 18px; border-radius: 16px; background: var(--uh-surface-2); border: 1px solid var(--uh-line); user-select: none; -webkit-user-select: none; }
+.inv-mark { position: absolute; inset: -40% -20%; display: grid; place-items: center; font: 800 120px/1 var(--f-display); color: var(--uh-accent); opacity: .07; transform: rotate(-24deg); animation: inv-drift 6s ease-in-out infinite alternate; pointer-events: none; }
+@keyframes inv-drift { from { transform: rotate(-24deg) translateX(-14%); } to { transform: rotate(-24deg) translateX(14%); } }
+.inv-token { font: 800 54px/1 var(--f-display); color: var(--uh-accent); letter-spacing: -0.02em; }
+.inv-rows { display: grid; gap: 4px; margin: 0; }
+.inv-rows div { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+.inv-rows dt { color: var(--uh-muted); } .inv-rows dd { margin: 0; font-weight: 600; text-align: right; }
+.inv-lines { list-style: none; margin: 0; padding: 10px 0; border-block: 1px dashed var(--uh-line); display: grid; gap: 4px; }
+.inv-lines li { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+.inv-total { display: flex; justify-content: space-between; font: 700 18px/1.2 var(--f-display); }
+.inv-live { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--uh-ok); font-variant-numeric: tabular-nums; }
+.inv-live .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--uh-ok); animation: inv-blink 1s steps(2) infinite; }
+@keyframes inv-blink { 50% { opacity: .2; } }
+.inv.expired { filter: grayscale(1); opacity: .7; } .inv.expired .inv-mark, .inv.expired .inv-live { animation: none; color: var(--uh-muted); }
+@media (prefers-reduced-motion: reduce) { .pay-tick, .inv-mark, .inv-live .dot { animation: none; } }
 .paid { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; font-weight: 600; color: var(--uh-ok); }
 
 /* Section drawings behind the hero */
@@ -177,3 +203,54 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--u
 .hero::before { content: ""; position: absolute; z-index: -1; right: 14px; bottom: -6px; width: min(42%, 300px); aspect-ratio: 5 / 4; background: var(--art) no-repeat right bottom / contain; opacity: .26; pointer-events: none; }
 @media (max-width: 640px) { .hero::before { width: 46%; opacity: .16; right: 6px; } }
 .bar-title .ico { box-shadow: 0 4px 12px var(--sec-glow, rgba(14,29,85,.2)); }
+
+/* Food: search in the hero, canteen cards, menu headings, ticket rows */
+.hero-search { margin-top: 14px; max-width: 520px; }
+.hero-search input { border: 0; border-radius: 14px; padding: 13px 16px; font-size: 15.5px; box-shadow: 0 8px 20px rgba(0,0,0,.18); }
+.canteen-card { text-align: left; cursor: pointer; display: grid; gap: 4px; font: inherit; color: inherit; border: 1px solid var(--uh-line); transition: transform .15s ease, box-shadow .15s ease; }
+.canteen-card:hover { transform: translateY(-2px); box-shadow: var(--uh-shadow); }
+.cat-h { font-size: 15px; margin: 18px 0 8px; color: var(--uh-muted); text-transform: uppercase; letter-spacing: .08em; }
+.ticket-row { align-items: center; gap: 14px; }
+.ticket-row.is-ready { border-color: var(--uh-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--uh-accent) 18%, transparent); }
+.cmp { padding: 8px 0; border-top: 1px solid var(--uh-line); }
+@media (max-width: 560px) { .ticket-row { flex-wrap: wrap; } }
+
+/* Owner dashboards */
+.stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 14px; }
+button.stat { text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.cols2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+@media (max-width: 760px) { .cols2 { grid-template-columns: minmax(0, 1fr); } }
+.ticket.is-ready { border-color: var(--uh-ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--uh-ok) 16%, transparent); }
+.menu-row { flex-wrap: wrap; }
+.qty-edit { display: grid; gap: 2px; color: var(--uh-muted); }
+.qty-edit input { width: 86px; padding: 6px 8px; }
+.hbar { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 36px; align-items: center; gap: 8px; font-size: 13.5px; padding: 4px 0; }
+.hbar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hbar i { display: block; height: 10px; border-radius: 6px; background: var(--uh-accent); min-width: 4px; }
+.hbar b { text-align: right; }
+.hours { display: grid; grid-template-columns: repeat(17, minmax(0, 1fr)); gap: 4px; align-items: end; height: 120px; }
+.hours div { height: 100%; display: grid; grid-template-rows: 1fr auto; align-items: end; gap: 4px; }
+.hours i { display: block; background: var(--uh-accent); border-radius: 4px 4px 0 0; min-height: 2px; opacity: .85; }
+.hours span { font-size: 10.5px; color: var(--uh-muted); text-align: center; height: 14px; white-space: nowrap; }
+details.ord { border-top: 1px solid var(--uh-line); padding: 8px 0; }
+details.ord summary { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; }
+details.ord summary::-webkit-details-marker { display: none; }
+details.ord ul { margin: 6px 0 0 4px; }
+.upi-to .upi-av { color: var(--upi); font: 700 18px/1 var(--f-display); }
+
+/* Xerox */
+.drop { display: grid; gap: 4px; place-items: center; text-align: center; padding: 26px 16px; border: 2px dashed var(--uh-line); border-radius: 16px; background: var(--uh-surface); cursor: pointer; }
+.drop span { color: var(--uh-muted); font-size: 13.5px; }
+.drop.over, .drop:hover { border-color: var(--uh-accent); background: var(--uh-surface-2); }
+.opt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.opt-grid .seg { display: flex; flex-wrap: wrap; }
+span.label, label.label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: var(--uh-text); }
+.pv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.pv-sheet { margin: 0; display: grid; gap: 4px; }
+.pv-sheet canvas { width: 100%; height: auto; box-shadow: 0 2px 10px rgba(0,0,0,.18); border-radius: 2px; background: #fff; }
+.pv-sheet figcaption { font-size: 12px; color: var(--uh-muted); text-align: center; }
+.q-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin-top: 8px; }
+.q-card { display: grid; gap: 4px; justify-items: start; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.q-card.is-printing { border-color: var(--uh-accent); }
+.thread { display: grid; gap: 2px; text-align: left; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--uh-line); background: var(--uh-surface); cursor: pointer; font: inherit; color: inherit; }
+.thread.on { border-color: var(--uh-accent); background: var(--uh-surface-2); }

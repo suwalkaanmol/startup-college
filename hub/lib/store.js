@@ -59,7 +59,7 @@ export function createStore(file) {
     remove(name, id) { const had = Boolean(col(name)[id]); delete col(name)[id]; if (had) save(); return had; },
     count(name) { return Object.keys(col(name)).length; },
 
-    // Daily counters, e.g. canteen tokens: next('food:foodys:2026-11-02') -> 1, 2, 3 ...
+    // Daily counters, e.g. canteen tokens: next('token:2026-11-02') -> 1, 2, 3 ...
     next(key) { data.seq[key] = (data.seq[key] || 0) + 1; save(); return data.seq[key]; },
   };
 }

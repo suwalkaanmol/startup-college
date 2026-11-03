@@ -13,17 +13,32 @@ npm test                # 10 automated checks
 
 With no `SMTP_URL`, sign-in codes are shown on screen, so you can test without email.
 
-### Test staff logins (development only)
+### Owner logins (development only)
 
-| Where | Username | Password |
+Each canteen and each Xerox shop has its own owner login and its own database. On the owner sign-in
+screen (Food → Owner login, Xerox → Owner login), pick the place and type its password.
+
+| Place | Password | Staff ID |
 |---|---|---|
-| Admin (`/admin/`) | admin | UniHub@Admin1 |
-| Food court canteen (`/food/staff.html`) | foodys | Foodys@2026 |
-| PRP kiosk canteen | prpkiosk | PrpKiosk@2026 |
-| Xerox PRP (`/xerox/staff.html`) | prp | PrpXerox@2026 |
-| Xerox TT / Ganga / Little / H / J block | tt, ganga, little, hblock, jblock | TtXerox@2026, GangaXerox@2026, Little@2026, HBlock@2026, JBlock@2026 |
+| KC | KcFood@2026 | kc |
+| Darling (DC) | Darling@2026 | darling |
+| Hangy & Swig | HangySwig@2026 | hangyswig |
+| Garnish | Garnish@2026 | garnish |
+| PRP Xerox | PrpXerox@2026 | prp |
+| TT Xerox | TtXerox@2026 | tt |
+| Ganga Xerox | GangaXerox@2026 | ganga |
+| Little Shop Xerox | Little@2026 | little |
+| H Block | HBlock@2026 | hblock |
+| J Block | JBlock@2026 | jblock |
+| UniHub admin (`/admin/`, signs in with the staff ID) | UniHub@Admin1 | admin |
 
 The admin can add more logins, reset passwords, add canteens and manage PG listings.
+
+### Where the data lives
+
+- `hub/data/hub.json`: students, owner logins, the list of canteens and shops, rides, PG.
+- `hub/data/places/food-<canteen>.json`: one canteen's menu, stock and orders (one file per canteen).
+- `hub/data/places/xerox-<shop>.json` and `xerox-<shop>-uploads/`: one shop's orders, chats and files.
 
 ## In production (Render)
 
@@ -39,7 +54,10 @@ to pay and nothing is made for no-shows. Payment is in **demo mode**: no money m
 works and the code is `123456`. To take real money, replace `takePayment()` in `hub/lib/pay.js` with a
 UPI gateway (Razorpay, Cashfree or PhonePe) and verify its signature there. Cancelled orders are marked refunded.
 
-Sample menus and PG listings are marked "Sample" in the app. Replace them from the staff and admin screens.
+The four canteen menus come from the Food team's data (KC, Darling, Hangy & Swig, Garnish). Owners change
+prices, stock and dishes from their dashboard. PG listings marked "Sample" are examples for the admin to replace.
+
+The Xerox print preview uses pdf.js 3.11.174 (Mozilla, Apache-2.0), kept in `hub/web/vendor/pdfjs/`.
 
 ## Where things are
 

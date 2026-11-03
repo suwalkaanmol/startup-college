@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { sign, verify } from './lib/jwt.js';
 import { sendMail } from './lib/mailer.js';
 import { createStore } from './lib/store.js';
+import { createPlaces } from './lib/places.js';
 import { createLive } from './lib/live.js';
 import { HttpError, send, fail, readJson, cookies, clientIp, limiter } from './lib/http.js';
 import { seed } from './seed.js';
@@ -126,10 +127,12 @@ function createRouter() {
 // ---------- app ----------
 export function createApp(cfg = makeConfig(), deps = {}) {
   const store = deps.store || createStore(cfg.dataFile);
+  // Each canteen and Xerox shop keeps its own database next to the main one.
+  const places = deps.places || createPlaces(path.dirname(cfg.dataFile));
   const mail = deps.sendMail || sendMail;
   const live = createLive();
   const log = deps.log || console.log;
-  seed(store, cfg, log);
+  seed(store, places, cfg, log);
 
   const ipCodeLimit = limiter(15 * 60e3, 20);
   const ipVerifyLimit = limiter(15 * 60e3, 60);
@@ -143,7 +146,7 @@ export function createApp(cfg = makeConfig(), deps = {}) {
     staff(req) { const c = verify(cookies(req).hub_staff, cfg.jwtSecret); return c && c.typ === 'staff' ? store.get('staff', c.sub) : null; },
   };
   const ctx = {
-    store, live, cfg,
+    store, places, live, cfg,
     setStaffSession(req, res, s) { addCookie(res, cookie(req, 'hub_staff', sign({ sub: s.id, typ: 'staff' }, cfg.jwtSecret, { expiresInSec: 12 * 3600 }), 12 * 3600)); },
     clearStaffSession(req, res) { addCookie(res, cookie(req, 'hub_staff', '', 0)); },
   };
@@ -220,16 +223,16 @@ export function createApp(cfg = makeConfig(), deps = {}) {
   r.del('/api/hub/me', 'signedIn', async ({ req, res, user }) => {
     const body = await readJson(req);
     if (String(body.confirm || '').trim().toUpperCase() !== 'DELETE') throw new HttpError(400, 'CONFIRM', 'Type DELETE to confirm.');
-    for (const [col, key] of [['pgProfiles', 'uid'], ['pgSaves', 'uid'], ['xeroxFiles', 'studentId']]) for (const d of store.list(col, (x) => x[key] === user.id)) store.remove(col, d.id);
+    for (const [col, key] of [['pgProfiles', 'uid'], ['pgSaves', 'uid']]) for (const d of store.list(col, (x) => x[key] === user.id)) store.remove(col, d.id);
+    for (const m of modules) m.forgetStudent?.(user.id);
     for (const c of store.list('pgConnects', (x) => x.from === user.id || x.to === user.id)) store.remove('pgConnects', c.id);
     store.deleteUser(user.id); addCookie(res, cookie(req, 'hub_session', '', 0));
     return { ok: true };
   });
   // Everything the student ordered, newest first, for the profile drawer.
   r.get('/api/hub/orders', 'student', ({ user }) => {
-    const f = store.list('foodOrders', (o) => o.studentId === user.id).map((o) => ({ source: 'food', id: o.id, title: o.canteenName, token: o.token, status: o.status, amount: o.total, at: o.createdAt, detail: o.items.map((i) => `${i.qty}× ${i.name}`).join(', ') }));
-    const x = store.list('xeroxOrders', (o) => o.studentId === user.id).map((o) => ({ source: 'xerox', id: o.id, title: o.shopName, token: o.token, status: o.status, amount: o.total, at: o.createdAt, detail: o.files.map((i) => i.name).join(', ') }));
-    return { orders: [...f, ...x].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 60) };
+    const all = modules.flatMap((m) => m.studentOrders?.(user.id) || []);
+    return { orders: all.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 60) };
   });
 
   // Live updates: GET /api/live?t=topic1,topic2 (each topic checked against who is asking)
@@ -304,15 +307,16 @@ export function createApp(cfg = makeConfig(), deps = {}) {
     }
   });
   setInterval(() => store.pruneCodes(), 10 * 60e3).unref();
-  return { server, store, cfg, live };
+  const flush = () => { store.flushNow(); places.flushAll(); };
+  return { server, store, places, cfg, live, flush };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const { server, cfg, store } = createApp();
+  const { server, cfg, flush } = createApp();
   server.listen(cfg.port, () => {
     console.log(`${cfg.appName} running at http://localhost:${cfg.port}`);
     if (!cfg.smtpUrl) console.log(cfg.showDevCodes ? 'No SMTP_URL set: sign-in codes are printed here and shown on screen (test mode).' : 'No SMTP_URL set: email sign-in is off.');
   });
-  const stop = () => { store.flushNow(); process.exit(0); };
+  const stop = () => { flush(); process.exit(0); };
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
 }

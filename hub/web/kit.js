@@ -113,21 +113,32 @@ export async function staffGate({ expect, title, onReady }) {
   const mount = $('#app');
   const start = (staff) => { mount.innerHTML = ''; onReady(staff); };
   try { const { staff } = await api('/api/staff/me'); if (!expect || staff.role === expect || staff.role === 'admin') return start(staff); } catch { /* not signed in */ }
-  mount.innerHTML = `<div class="signin"><form class="card" id="staff-login" novalidate>
-      <h2>${esc(title)}</h2><p class="muted" style="margin-bottom:16px">Sign in with the staff ID and password from your UniHub admin.</p>
-      <div class="field"><label for="sid">Staff ID</label><input id="sid" autocomplete="username" autocapitalize="none" spellcheck="false" required></div>
+  let list = [];
+  if (expect) { try { list = (await api('/api/staff/places'))[expect] || []; } catch { /* admin mode only */ } }
+  const what = expect === 'canteen' ? 'canteen' : 'shop';
+  let byPlace = Boolean(expect && list.length);
+  const draw = () => {
+    mount.innerHTML = `<div class="signin"><form class="card" id="staff-login" novalidate>
+      <h2>${esc(title)}</h2><p class="muted" style="margin-bottom:16px">${byPlace ? `Pick your ${what} and enter its owner password.` : 'Sign in with your staff ID and password.'}</p>
+      ${byPlace ? `<div class="field"><label for="splace">Your ${what}</label><select id="splace"><option value="">Choose your ${what}</option>${list.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select></div>`
+        : '<div class="field"><label for="sid">Staff ID</label><input id="sid" autocomplete="username" autocapitalize="none" spellcheck="false" required></div>'}
       <div class="field"><label for="spw">Password</label><input id="spw" type="password" autocomplete="current-password" required></div>
       <p class="err" id="serr" role="alert"></p>
-      <button class="btn primary block" type="submit">Sign in</button></form></div>`;
-  $('#sid').focus();
-  $('#staff-login').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const username = $('#sid').value.trim(), password = $('#spw').value, err = $('#serr');
-    if (!username || !password) { err.textContent = 'Enter your staff ID and password.'; return; }
-    const btn = e.target.querySelector('button'); btn.disabled = true; btn.textContent = 'Signing in…';
-    try { const { staff } = await api('/api/staff/login', { method: 'POST', body: { username, password, expect } }); start(staff); }
-    catch (x) { err.textContent = x.message; btn.disabled = false; btn.textContent = 'Sign in'; $('#spw').select(); }
-  });
+      <button class="btn primary block" type="submit">Sign in to dashboard</button>
+      ${expect && list.length ? `<button type="button" class="link small" id="swap" style="margin-top:12px">${byPlace ? 'UniHub admin? Sign in with a staff ID' : `Sign in as a ${what} owner`}</button>` : ''}</form></div>`;
+    (byPlace ? $('#splace') : $('#sid')).focus();
+    $('#swap')?.addEventListener('click', () => { byPlace = !byPlace; draw(); });
+    $('#staff-login').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const err = $('#serr'), password = $('#spw').value;
+      const body = byPlace ? { place: $('#splace').value, password, expect } : { username: $('#sid').value.trim(), password, expect };
+      if ((byPlace ? !body.place : !body.username) || !password) { err.textContent = byPlace ? `Pick your ${what} and enter the password.` : 'Enter your staff ID and password.'; return; }
+      const btn = e.target.querySelector('button[type=submit]'); btn.disabled = true; btn.textContent = 'Signing in…';
+      try { const { staff } = await api('/api/staff/login', { method: 'POST', body }); start(staff); }
+      catch (x) { err.textContent = x.message; btn.disabled = false; btn.textContent = 'Sign in to dashboard'; $('#spw').select(); }
+    });
+  };
+  draw();
 }
 
 export function staffMenu(actions, staff) {
@@ -153,37 +164,45 @@ export function staffMenu(actions, staff) {
   actions.appendChild(b);
 }
 
-// Pay by phone (UPI) before an order is sent. Step 1: mobile number. Step 2: the 6-digit code. Then onPay({ phone, otp })
-// places the order; if it throws, the message shows here and the student can fix the code.
-export function paySheet({ amount, payee, phone = '', onPay }) {
+// Pay by UPI before an order is sent. The money goes to that canteen's or shop's own UPI ID.
+// Step 1: mobile number linked to UPI. Step 2: the 6-digit code. Then onPay({ phone, otp }) places the order;
+// if it throws, the message shows here and the student can fix the code.
+export function paySheet({ amount, payee, upi = '', phone = '', onPay }) {
   const ph = String(phone).replace(/^\+91/, '');
   const s = sheet({
-    title: 'Pay online',
+    title: 'Pay with UPI',
     body: `<div class="pay">
-      <div class="pay-amt"><span class="muted small">Paying ${esc(payee)}</span><b class="num">${money(amount)}</b></div>
+      <div class="upi-card">
+        <div class="upi-to"><span class="upi-av" aria-hidden="true">${esc((payee || '?').trim()[0] || '?')}</span>
+          <div><b>${esc(payee)}</b><span>${upi ? esc(upi) : 'Paid straight to the owner'}</span></div></div>
+        <div class="upi-amt num">${money(amount)}</div>
+      </div>
       <form id="pay-1" class="stack" novalidate>
         <div class="field"><label for="pay-ph">Mobile number linked to your UPI</label>
           <div class="pay-ph"><span>+91</span><input id="pay-ph" inputmode="numeric" autocomplete="tel-national" maxlength="10" value="${esc(ph)}" placeholder="98765 43210"></div></div>
-        <button class="btn primary block" type="submit">Send code</button>
+        <button class="btn upi block" type="submit">Proceed to pay</button>
       </form>
       <form id="pay-2" class="stack" novalidate hidden>
-        <p class="small">We sent a 6-digit code to <b id="pay-to"></b>. <button type="button" class="link" id="pay-edit">Change</button></p>
-        <div class="field"><label for="pay-otp">Code</label><input id="pay-otp" class="pay-otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="••••••"></div>
-        <p class="notice small">Demo payment: no money is taken. Use the code <b>123456</b>.</p>
-        <button class="btn primary block" type="submit" id="pay-go">Pay ${money(amount)}</button>
+        <p class="small">Enter the 6-digit code sent to <b id="pay-to"></b>. <button type="button" class="link" id="pay-edit">Change</button></p>
+        <div class="field"><label for="pay-otp" class="sr">6-digit code</label>
+          <div class="otp-wrap"><input id="pay-otp" class="pay-otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-describedby="pay-hint">
+          <div class="otp-boxes" aria-hidden="true">${'<span></span>'.repeat(6)}</div></div></div>
+        <p class="notice small" id="pay-hint">Demo payment: no money is taken. Use the code <b>123456</b>.</p>
+        <button class="btn upi block" type="submit" id="pay-go">Pay ${money(amount)}</button>
       </form>
-      <div id="pay-done" class="pay-done" hidden aria-live="polite"><div class="pay-tick" aria-hidden="true">✓</div><b>Payment done</b><span class="muted small" id="pay-ref"></span></div>
+      <div id="pay-done" class="pay-done" hidden aria-live="polite"><div class="pay-tick" aria-hidden="true">✓</div><b>Payment successful</b><span class="muted small" id="pay-ref"></span></div>
       <p class="err" id="pay-err" role="alert"></p></div>`,
   });
   const q = (sel) => s.el.querySelector(sel);
   const err = (m = '') => { q('#pay-err').textContent = m; };
+  const boxes = () => { const v = q('#pay-otp').value; s.el.querySelectorAll('.otp-boxes span').forEach((b, i) => { b.textContent = v[i] ? '•' : ''; b.classList.toggle('on', i === v.length); }); };
   q('#pay-ph').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 10); });
-  q('#pay-otp').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6); err(); });
+  q('#pay-otp').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6); err(); boxes(); });
   q('#pay-1').addEventListener('submit', (e) => {
     e.preventDefault(); const v = q('#pay-ph').value;
     if (!/^[6-9]\d{9}$/.test(v)) { err('Enter a 10-digit Indian mobile number.'); return; }
     err(); q('#pay-to').textContent = `+91 ${v.slice(0, 5)} ${v.slice(5)}`;
-    q('#pay-1').hidden = true; q('#pay-2').hidden = false; q('#pay-otp').focus();
+    q('#pay-1').hidden = true; q('#pay-2').hidden = false; q('#pay-otp').focus(); boxes();
   });
   q('#pay-edit').addEventListener('click', () => { q('#pay-2').hidden = true; q('#pay-1').hidden = false; q('#pay-ph').focus(); err(); });
   q('#pay-2').addEventListener('submit', async (e) => {
@@ -192,9 +211,51 @@ export function paySheet({ amount, payee, phone = '', onPay }) {
     const btn = q('#pay-go'); btn.disabled = true; btn.textContent = 'Paying…'; err();
     try {
       const res = await onPay({ phone: q('#pay-ph').value, otp });
-      q('#pay-2').hidden = true; q('#pay-done').hidden = false; q('#pay-ref').textContent = res?.ref ? `Ref ${res.ref}` : '';
+      q('#pay-2').hidden = true; q('#pay-done').hidden = false; q('#pay-ref').textContent = res?.ref ? `UPI ref ${res.ref}` : '';
       setTimeout(() => { s.close(); res?.after?.(); }, 1100);
-    } catch (x) { err(x.message); btn.disabled = false; btn.textContent = `Pay ${money(amount)}`; if (x.code === 'PAY_CODE') q('#pay-otp').select(); else if (!String(x.code || '').startsWith('PAY')) setTimeout(s.close, 1800); }
+    } catch (x) { err(x.message); btn.disabled = false; btn.textContent = `Pay ${money(amount)}`; if (x.code === 'PAY_CODE') { q('#pay-otp').value = ''; boxes(); q('#pay-otp').focus(); } else if (!String(x.code || '').startsWith('PAY')) setTimeout(s.close, 1800); }
   });
   return s;
+}
+
+const hm = (iso) => new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+export const clock = hm;
+
+// A live invoice: the clock ticks and the watermark moves, so a screenshot can't pass for a real token at the counter.
+// rows: [[label, value], ...]; lines: [[text, amount], ...]
+export function liveInvoice({ title = 'Invoice', token, place, at, rows = [], lines = [], total, paid = true, expired = false, note = '' }) {
+  const s = sheet({
+    title,
+    body: `<div class="inv ${expired ? 'expired' : ''}" aria-live="off">
+      <div class="inv-mark" aria-hidden="true">${esc(token)}</div>
+      <p class="inv-token">${esc(token)}</p>
+      <p class="muted small">${esc(place)} · ${esc(when(at, { year: 'numeric', second: '2-digit' }))}</p>
+      <dl class="inv-rows">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+      <ul class="inv-lines">${lines.map(([t, a]) => `<li><span>${esc(t)}</span><b class="num">${money(a)}</b></li>`).join('')}</ul>
+      <div class="inv-total"><span>${paid ? 'Paid' : 'Total'}</span><b class="num">${money(total)}</b></div>
+      ${note ? `<p class="muted small">${esc(note)}</p>` : ''}
+      <p class="inv-live">${expired ? 'Token expired' : '<span class="dot" aria-hidden="true"></span>LIVE <span data-clock></span> · valid today only'}</p>
+    </div>`,
+    foot: '<button class="btn primary block" data-close>Close</button>',
+  });
+  s.el.querySelector('.sheet-foot [data-close]').addEventListener('click', s.close);
+  const tick = () => { const c = s.el.querySelector('[data-clock]'); if (!c || !document.body.contains(c)) { clearInterval(t); return; } c.textContent = new Date().toLocaleTimeString('en-IN', { hour12: false }); };
+  const t = setInterval(tick, 1000); tick();
+  return s;
+}
+
+// Opens a printable bill (canteen and shop counters).
+export function printBill({ place, token, at, rows = [], lines = [], total }) {
+  const w = window.open('', '_blank', 'width=420,height=640');
+  if (!w) { toast('Allow pop-ups to print the bill.'); return; }
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Bill ${esc(token)}</title><style>
+    body{font:14px/1.5 ui-monospace,Menlo,Consolas,monospace;margin:24px;color:#000} h1{font-size:22px;text-align:center;margin:0} .tok{font-size:44px;text-align:center;font-weight:700;margin:12px 0}
+    table{width:100%;border-collapse:collapse} td{padding:3px 0} td:last-child{text-align:right} hr{border:0;border-top:1px dashed #000;margin:10px 0} .tot td{font-weight:700;font-size:16px} p{text-align:center}
+    @page{size:80mm auto;margin:6mm}</style></head><body>
+    <h1>${esc(place)}</h1><div class="tok">${esc(token)}</div>
+    <table>${[['Date', new Date(at).toLocaleDateString('en-IN')], ...rows].map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table><hr>
+    <table>${lines.map(([t, a]) => `<tr><td>${esc(t)}</td><td>₹${esc(a)}</td></tr>`).join('')}</table><hr>
+    <table class="tot"><tr><td>Total (paid)</td><td>₹${esc(total)}</td></tr></table><p>Thank you!</p>
+    <script>window.onload=function(){window.print()}<\/script></body></html>`);
+  w.document.close();
 }

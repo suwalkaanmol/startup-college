@@ -30,7 +30,7 @@ async function start(me) {
   const showPassword = (title, who, pw) => {
     const s = sheet({ title, body: `<p>Give these to <b>${esc(who.name)}</b>. The password is shown only once.</p>
       <div class="card"><p class="muted small">Staff ID</p><p class="token" style="font-size:24px">${esc(who.username)}</p><p class="muted small" style="margin-top:10px">Password</p><p class="token" style="font-size:24px;overflow-wrap:anywhere">${esc(pw)}</p></div>
-      <p class="muted small">They sign in at ${who.role === 'canteen' ? 'Food → Staff login' : who.role === 'xerox' ? 'Xerox → Staff login' : 'the admin page'} and can change the password there.</p>`,
+      <p class="muted small">${who.role === 'admin' ? 'They sign in on the admin page with this staff ID.' : `They sign in at ${who.role === 'canteen' ? 'Food' : 'Xerox'} → Owner login by picking ${esc(who.placeName || "their place")} and typing this password.`} They can change it there.</p>`,
       foot: '<button class="btn ghost block" id="copy-pw">Copy staff ID and password</button><button class="btn primary block" id="pw-done">Done</button>' });
     s.el.querySelector('#copy-pw').addEventListener('click', () => { navigator.clipboard?.writeText(`Staff ID: ${who.username}\nPassword: ${pw}`).then(() => toast('Copied.'), () => toast('Copy was blocked. Write them down instead.')); });
     s.el.querySelector('#pw-done').addEventListener('click', s.close);
@@ -48,8 +48,8 @@ async function start(me) {
       const s = sheet({ title: 'New staff login', body: `<form novalidate>
         <div class="field"><label for="n-role">Role</label><select id="n-role"><option value="canteen">Canteen staff</option><option value="xerox">Xerox shop staff</option><option value="admin">Admin</option></select></div>
         <div class="field" id="n-place-f"><label for="n-place">Canteen or shop</label><select id="n-place">${placeOptions('canteen')}</select></div>
-        <div class="field"><label for="n-name">Name shown on the page</label><input id="n-name" maxlength="60" placeholder="Foodys evening counter"></div>
-        <div class="field"><label for="n-user">Staff ID</label><input id="n-user" maxlength="30" autocapitalize="none" placeholder="foodys.evening"></div>
+        <div class="field"><label for="n-name">Name shown on the page</label><input id="n-name" maxlength="60" placeholder="KC evening counter"></div>
+        <div class="field"><label for="n-user">Staff ID</label><input id="n-user" maxlength="30" autocapitalize="none" placeholder="kc.evening"></div>
         <div class="field"><label for="n-pw">Password (leave empty to generate one)</label><input id="n-pw" type="text" autocomplete="off"></div>
         <p class="err" id="n-err" role="alert"></p></form>`, foot: '<button class="btn primary block" id="n-save">Create login</button>' });
       $('#n-role').addEventListener('change', (e) => { $('#n-place-f').hidden = e.target.value === 'admin'; if (e.target.value !== 'admin') $('#n-place').innerHTML = placeOptions(e.target.value); });
