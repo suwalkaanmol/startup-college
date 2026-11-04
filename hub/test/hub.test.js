@@ -169,37 +169,62 @@ test('xerox: Word and image pages, ranges, N-in-1, A3, binding, chat, separate d
   assert.equal((await prp('/api/xerox/staff/chats')).body.threads.length, 0, 'other shops can’t read it');
 });
 
-test('travel: girls-only rides, join, chat, fare split', async () => {
+test('travel: either direction, own hostel blocks, flexible size, matches, join requests, members-only chat', async () => {
   const a = await student('anya2024@vitstudent.ac.in', 'Anya S', 'female');
   const b = await student('diya2024@vitstudent.ac.in', 'Diya P', 'female');
   const m = await student('chetan2024@vitstudent.ac.in', 'Chetan K', 'male');
   const date = new Date(Date.now() + 2 * 86400e3).toISOString().slice(0, 10);
-  const r = (await a('/api/travel/rides', 'POST', { dest: 'Chennai Airport', pickup: 'Main Gate', date, time: '06:30', vehicle: 'cab', seats: 4, girlsOnly: true, fare: 2400 })).body.ride;
-  assert.equal((await m('/api/travel/rides')).body.rides.length, 0, 'hidden from boys');
-  assert.equal((await m(`/api/travel/rides/${r.id}/join`, 'POST')).status, 403);
-  assert.equal((await b(`/api/travel/rides/${r.id}/join`, 'POST')).body.ride.farePerPerson, 1200);
+  assert.ok((await a('/api/travel/meta')).body.hostels.includes('Ladies’ Hostel A block'));
+  assert.equal((await a('/api/travel/rides', 'POST', { from: 'Men’s Hostel K block', to: 'Chennai Airport', date, time: '06:30', vehicle: 'cab', maxPeople: 4 })).status, 400, 'not her hostel');
+  assert.equal((await a('/api/travel/rides', 'POST', { from: 'Main Gate', to: 'TT', date, time: '06:30', vehicle: 'cab', maxPeople: 4 })).status, 400, 'campus to campus');
+  const r = (await a('/api/travel/rides', 'POST', { from: 'Ladies’ Hostel A block', to: 'Chennai Airport', date, time: '06:30', vehicle: 'cab', maxPeople: 4, minPeople: 'any', girlsOnly: true, fare: 2400 })).body.ride;
+  assert.equal(r.dir, 'out'); assert.equal(r.minPeople, 2); assert.equal(r.going, false);
+  // Coming back from the airport is the other direction: not a match.
+  const back = (await b('/api/travel/matches?' + new URLSearchParams({ from: 'Chennai Airport', to: 'Main Gate', date, time: '06:30' }))).body.rides;
+  assert.equal(back.length, 0);
+  const same = (await b('/api/travel/matches?' + new URLSearchParams({ from: 'Main Gate', to: 'Chennai Airport', date, time: '07:00' }))).body.rides;
+  assert.equal(same[0].id, r.id, 'offered as a match instead of a new ride');
+  assert.equal((await m('/api/travel/rides')).body.rides.length, 0, 'girls-only hidden from boys');
+  assert.equal((await b(`/api/travel/rides/${r.id}/request`, 'POST', { note: 'From A block too' })).body.ride.requested, true);
+  assert.equal((await b(`/api/travel/rides/${r.id}`)).body.messages.length, 0, 'no chat before being accepted');
+  assert.equal((await b(`/api/travel/rides/${r.id}/messages`, 'POST', { text: 'hi' })).status, 403);
+  assert.equal((await b(`/api/travel/rides/${r.id}/requests/x`, 'POST', { accept: true })).status, 403, 'only the rider decides');
+  const reqs = (await a('/api/travel/mine')).body.rides[0].requests;
+  assert.equal(reqs[0].note, 'From A block too');
+  const acc = (await a(`/api/travel/rides/${r.id}/requests/${reqs[0].uid}`, 'POST', { accept: true })).body.ride;
+  assert.equal(acc.going, true); assert.equal(acc.farePerPerson, 1200);
   assert.equal((await b(`/api/travel/rides/${r.id}/messages`, 'POST', { text: 'Gate at 6:15?' })).status, 200);
   assert.ok((await a(`/api/travel/rides/${r.id}`)).body.messages.some((x) => x.text === 'Gate at 6:15?'));
 });
 
-test('pg: same-gender matches, contacts only when both connect, enquiries reach admin', async () => {
+test('pg mate: same city and joining window, same gender, contacts only when both connect', async () => {
+  const join = new Date(Date.now() + 40 * 86400e3).toISOString().slice(0, 10);
+  const later = new Date(Date.now() + 60 * 86400e3).toISOString().slice(0, 10);
+  const far = new Date(Date.now() + 150 * 86400e3).toISOString().slice(0, 10);
   const a = await student('meera2024@vitstudent.ac.in', 'Meera K', 'female');
   const b = await student('nisha2024@vitstudent.ac.in', 'Nisha R', 'female');
+  const c = await student('tara2024@vitstudent.ac.in', 'Tara J', 'female');
   const m = await student('arjun2024@vitstudent.ac.in', 'Arjun M', 'male');
-  const moveIn = new Date(Date.now() + 20 * 86400e3).toISOString().slice(0, 10);
-  for (const c of [a, b, m]) await c('/api/pg/profile', 'PUT', { moveIn, budgetMax: 9000, tags: ['Quiet'] });
+  assert.equal((await a('/api/pg/matches')).body.needsProfile, true);
+  const base = { city: 'Bengaluru', area: 'Whitefield (ITPL)', budgetMax: 10000, tags: ['Quiet'] };
+  await a('/api/pg/profile', 'PUT', { ...base, company: 'Wipro', joinDate: join, campusTill: join, meetAt: 'SJT canteen' });
+  await b('/api/pg/profile', 'PUT', { ...base, company: 'wipro', joinDate: later });
+  await c('/api/pg/profile', 'PUT', { ...base, company: 'TCS', joinDate: far });
+  await m('/api/pg/profile', 'PUT', { ...base, company: 'Wipro', joinDate: join });
   const mine = (await a('/api/pg/matches')).body.matches;
-  assert.ok(mine.every((x) => x.name !== 'Arjun M'));
-  const nisha = mine.find((x) => x.name === 'Nisha R');
-  await a(`/api/pg/connect/${nisha.uid}`, 'POST');
-  assert.equal((await a('/api/pg/matches')).body.matches.find((x) => x.uid === nisha.uid).phone, undefined);
+  assert.deepEqual(mine.map((x) => x.name), ['Nisha R'], 'not the boy, not someone joining months later');
+  assert.equal(mine[0].sameCompany, true); assert.equal(mine[0].sameArea, true); assert.equal(mine[0].batch, 'BCE · 2024 batch');
+  await a(`/api/pg/connect/${mine[0].uid}`, 'POST');
+  assert.equal((await a('/api/pg/matches')).body.matches[0].phone, undefined);
   const meera = (await b('/api/pg/matches')).body.matches.find((x) => x.name === 'Meera K');
+  assert.equal(meera.theyConnected, true); assert.equal(meera.meetAt, 'SJT canteen');
   await b(`/api/pg/connect/${meera.uid}`, 'POST');
-  assert.equal((await a('/api/pg/matches')).body.matches.find((x) => x.uid === nisha.uid).phone, '+919876543210');
+  assert.equal((await a('/api/pg/matches')).body.matches[0].phone, '+919876543210');
   const admin = await staffLogin('admin', 'UniHub@Admin1');
-  const l = (await admin('/api/admin/pg/listings', 'POST', { name: 'Test PG', area: 'Katpadi', rent: 8000, gender: 'female', sharing: 2 })).body.listing;
-  assert.equal((await a(`/api/pg/listings/${l.id}/enquire`, 'POST', { message: 'Room in July?' })).status, 200);
-  assert.ok((await admin('/api/admin/pg/enquiries')).body.enquiries.some((e) => e.message === 'Room in July?'));
+  const l = (await admin('/api/admin/pg/listings', 'POST', { name: 'Test PG', city: 'Bengaluru', area: 'Whitefield (ITPL)', rent: 8000, gender: 'female', sharing: 2 })).body.listing;
+  assert.ok((await a('/api/pg/listings')).body.listings.some((x) => x.id === l.id), 'PGs in her job city');
+  assert.equal((await a(`/api/pg/listings/${l.id}/enquire`, 'POST', { message: 'Room in Dec?' })).status, 200);
+  assert.ok((await admin('/api/admin/pg/enquiries')).body.enquiries.some((e) => e.message === 'Room in Dec?'));
 });
 
 test('private files are never served', async () => {

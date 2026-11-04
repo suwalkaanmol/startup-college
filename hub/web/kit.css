@@ -260,3 +260,29 @@ span.label, label.label { display: block; font-size: 13px; font-weight: 600; mar
 .verify-badge { font: 700 18px/1.2 var(--f-display); }
 .verify-badge.ok { color: var(--uh-ok); } .verify-badge.bad { color: var(--uh-bad); }
 .verify-ok { border-color: var(--uh-ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--uh-ok) 14%, transparent); }
+
+/* Travel: route box like ride apps (green = start, red = destination, swap button) */
+.route-box { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 10px 10px 10px 14px; border-radius: 16px; background: var(--uh-surface); border: 1px solid var(--uh-line); color: var(--uh-text); }
+.hero-route { margin-top: 14px; max-width: 560px; }
+.hero-route .route-box { box-shadow: 0 10px 24px rgba(0, 0, 0, .18); border: 0; }
+.route-rows { display: grid; gap: 0; min-width: 0; }
+.route-row { display: grid; grid-template-columns: 14px minmax(0, 1fr); align-items: center; gap: 10px; }
+.route-row select { border: 0; background: transparent; padding: 9px 4px; font-weight: 600; font-size: 15px; color: var(--uh-text); min-width: 0; }
+.route-row select:focus-visible { outline: 2px solid var(--uh-accent); border-radius: 8px; }
+.route-row + .route-line + .route-row { border-top: 1px solid var(--uh-line); }
+.route-line { position: relative; height: 0; }
+.route-line::before { content: ""; position: absolute; left: 6px; top: -10px; height: 20px; border-left: 2px dotted var(--uh-muted); }
+.dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex: none; }
+.dot.go { background: #1aa260; box-shadow: 0 0 0 3px rgba(26, 162, 96, .2); }
+.dot.stop { background: #e5383b; box-shadow: 0 0 0 3px rgba(229, 56, 59, .2); border-radius: 3px; }
+.swap { width: 42px; height: 42px; border-radius: 50%; border: 1.5px solid var(--uh-line); background: var(--uh-surface-2); color: var(--uh-text); font: 700 20px/1 var(--f-body); cursor: pointer; display: grid; place-items: center; transition: transform .2s ease; }
+.swap:hover { transform: rotate(180deg); }
+.route-mini { display: grid; gap: 4px; font-size: 14px; font-weight: 600; }
+.route-mini.big { font-size: 16px; }
+.route-mini .rl { display: flex; align-items: center; gap: 8px; }
+.match-box { border-color: var(--uh-accent); background: var(--uh-surface-2); }
+@media (prefers-reduced-motion: reduce) { .swap { transition: none; } }
+
+/* PG Mate */
+.score { font: 700 15px/1 var(--f-display); color: var(--uh-accent); background: var(--uh-surface-2); border: 1px solid var(--uh-line); padding: 7px 9px; border-radius: 999px; }
+.meet { padding: 8px 10px; border-radius: 10px; background: var(--uh-surface-2); }

@@ -99,9 +99,10 @@ async function start(me) {
   function editPg(l) {
     const s = sheet({ title: l ? 'Edit PG' : 'Add PG', body: `<form novalidate>
       <div class="field"><label for="g-name">Name</label><input id="g-name" maxlength="60" value="${esc(l && !l.sample ? l.name : '')}"></div>
-      <div class="field"><label for="g-area">Area</label><input id="g-area" maxlength="60" value="${esc(l?.area || '')}" placeholder="Near VIT Main Gate"></div>
+      <div class="field"><label for="g-city">City</label><input id="g-city" maxlength="40" list="g-cities" value="${esc(l?.city || '')}" placeholder="Bengaluru"><datalist id="g-cities">${['Bengaluru', 'Hyderabad', 'Chennai', 'Pune', 'Mumbai', 'Delhi NCR', 'Kolkata', 'Kochi', 'Trivandrum', 'Coimbatore', 'Mysuru'].map((c) => `<option value="${c}">`).join('')}</datalist></div>
+      <div class="field"><label for="g-area">Office area</label><input id="g-area" maxlength="60" value="${esc(l?.area || '')}" placeholder="Whitefield (ITPL)"></div>
       <div class="form-grid"><div class="field"><label for="g-rent">Rent / month (₹)</label><input id="g-rent" inputmode="numeric" value="${l?.rent ?? ''}"></div>
-        <div class="field"><label for="g-dist">Distance from VIT (km)</label><input id="g-dist" inputmode="decimal" value="${l?.distanceKm ?? ''}"></div>
+        <div class="field"><label for="g-dist">Distance from the office area (km)</label><input id="g-dist" inputmode="decimal" value="${l?.distanceKm ?? ''}"></div>
         <div class="field"><label for="g-share">People per room</label><select id="g-share">${[1, 2, 3, 4, 5, 6].map((n) => `<option ${l?.sharing === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
         <div class="field"><label for="g-gender">For</label><select id="g-gender"><option value="male" ${l?.gender === 'male' ? 'selected' : ''}>Boys</option><option value="female" ${l?.gender === 'female' ? 'selected' : ''}>Girls</option><option value="any" ${l?.gender === 'any' ? 'selected' : ''}>Anyone</option></select></div></div>
       <label class="check" style="margin-bottom:10px"><input type="checkbox" id="g-food" ${l?.food ? 'checked' : ''}> Food included</label>
@@ -112,7 +113,7 @@ async function start(me) {
       foot: `<button class="btn primary block" id="g-save">${l ? 'Save' : 'Add PG'}</button>` });
     $('#g-am').addEventListener('click', (e) => { const b = e.target.closest('[data-am]'); if (b) b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); });
     $('#g-save').addEventListener('click', async () => {
-      const body = { name: $('#g-name').value, area: $('#g-area').value, rent: Number($('#g-rent').value), distanceKm: Number($('#g-dist').value), sharing: Number($('#g-share').value), gender: $('#g-gender').value, food: $('#g-food').checked, amenities: $$('#g-am [aria-pressed="true"]').map((b) => b.dataset.am), contactName: $('#g-cn').value, contactPhone: $('#g-cp').value };
+      const body = { name: $('#g-name').value, city: $('#g-city').value, area: $('#g-area').value, rent: Number($('#g-rent').value), distanceKm: Number($('#g-dist').value), sharing: Number($('#g-share').value), gender: $('#g-gender').value, food: $('#g-food').checked, amenities: $$('#g-am [aria-pressed="true"]').map((b) => b.dataset.am), contactName: $('#g-cn').value, contactPhone: $('#g-cp').value };
       try { await api(l ? `/api/admin/pg/listings/${l.id}` : '/api/admin/pg/listings', { method: l ? 'PUT' : 'POST', body }); s.close(); toast('Saved.'); loadPg(); refresh(); }
       catch (x) { $('#g-err').textContent = x.message; }
     });

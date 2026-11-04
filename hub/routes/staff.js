@@ -93,7 +93,7 @@ export default function staffRoutes(r, { store, places, setStaffSession, clearSt
   });
 
   const listingInput = (b) => ({
-    name: need.str(b.name, 'PG name', { max: 60 }), area: need.str(b.area, 'Area', { max: 60 }),
+    name: need.str(b.name, 'PG name', { max: 60 }), city: need.str(b.city, 'City', { max: 40 }), area: need.str(b.area, 'Office area', { max: 60 }),
     distanceKm: Math.round(Number(b.distanceKm) * 10) / 10 || 0,
     rent: need.int(b.rent, 'Monthly rent', { min: 500, max: 100000 }),
     gender: need.oneOf(b.gender, 'Who it’s for', ['male', 'female', 'any']),

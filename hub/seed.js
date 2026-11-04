@@ -182,17 +182,20 @@ export function prepFor(name, category) {
   return 15;
 }
 
+// Example PGs near office areas (PG Mate is for after placements). Marked as samples for the admin to replace.
 const PG_SAMPLES = [
-  { name: 'Sample PG: Green Nest', area: 'Near VIT Main Gate', distanceKm: 0.8, rent: 9000, gender: 'male', sharing: 2, food: true, amenities: ['Wi-Fi', 'AC', 'Mess', 'Laundry'] },
-  { name: 'Sample PG: Lotus Residency', area: 'Gandhi Nagar, Katpadi', distanceKm: 2.5, rent: 7500, gender: 'female', sharing: 3, food: true, amenities: ['Wi-Fi', 'Mess', 'CCTV', 'Warden'] },
-  { name: 'Sample PG: Riverside Rooms', area: 'Katpadi Junction', distanceKm: 4.1, rent: 11000, gender: 'any', sharing: 1, food: false, amenities: ['Wi-Fi', 'AC', 'Attached bath'] },
+  { name: 'Sample PG: Green Nest', city: 'Bengaluru', area: 'Whitefield (ITPL)', distanceKm: 1.2, rent: 9500, gender: 'male', sharing: 2, food: true, amenities: ['Wi-Fi', 'AC', 'Food', 'Laundry'] },
+  { name: 'Sample PG: Lotus Residency', city: 'Hyderabad', area: 'Gachibowli', distanceKm: 1.5, rent: 8500, gender: 'female', sharing: 2, food: true, amenities: ['Wi-Fi', 'Food', 'CCTV', 'Housekeeping'] },
+  { name: 'Sample PG: Harbour Stay', city: 'Chennai', area: 'OMR Sholinganallur', distanceKm: 0.8, rent: 7500, gender: 'any', sharing: 3, food: false, amenities: ['Wi-Fi', 'AC', 'Attached bath'] },
 ];
 
-const SEED_VERSION = 2;
+const SEED_VERSION = 3;
 
 export function seed(store, places, cfg, log = console.log) {
   const meta = store.get('meta', 'seed');
-  if ((meta?.v || 1) < SEED_VERSION && store.count('canteens')) upgradeFromV1(store);
+  if ((meta?.v || 1) < 2 && store.count('canteens')) upgradeFromV1(store);
+  // Version 3: PG Mate is about office cities, so the old near-campus sample PGs are replaced.
+  if ((meta?.v || 1) < 3) for (const l of store.list('pgListings', (x) => x.sample && !x.city)) store.remove('pgListings', l.id);
 
   for (const c of CANTEENS) {
     if (store.get('canteens', c.id)) continue;
