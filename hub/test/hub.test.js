@@ -10,12 +10,19 @@ import { sign, verify } from '../lib/jwt.js';
 import { sendMail } from '../lib/mailer.js';
 import { countPdfPages, priceFile, inspectFile } from '../routes/xerox.js';
 import { RATES } from '../seed.js';
+import { pgBackend } from '../lib/backend.js';
+import { createPg } from '../lib/pg.js';
+import { sendBrevo } from '../lib/mailer.js';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'unihub-'));
-const { server, places } = createApp({ ...makeConfig({ NODE_ENV: 'test' }), dataFile: path.join(dir, 'hub.json'), showDevCodes: true }, { log: () => {} });
+// TEST_DATABASE_URL=postgresql://... runs everything against PostgreSQL instead of files (tables are wiped).
+const DB = process.env.TEST_DATABASE_URL;
+if (DB) { const db = createPg(DB); await db.query('DROP TABLE IF EXISTS unihub_docs, unihub_blobs'); db.close(); }
+const backend = DB ? await pgBackend(DB, dir, () => {}) : undefined;
+const { server, places, flush } = createApp({ ...makeConfig({ NODE_ENV: 'test' }), dataFile: path.join(dir, 'hub.json'), showDevCodes: true }, { log: () => {}, backend });
 let base;
 test.before(() => new Promise((r) => server.listen(0, () => { base = `http://127.0.0.1:${server.address().port}`; r(); })));
-test.after(() => new Promise((r) => server.close(r)));
+test.after(() => new Promise((r) => server.close(r)).then(() => backend?.flush()).then(() => backend?.close()));
 
 // A tiny browser: keeps cookies per client.
 function client() {
@@ -258,4 +265,23 @@ test('mailer speaks SMTP: EHLO, AUTH, MAIL, RCPT, DATA', async () => {
   smtp.close();
   assert.deepEqual(seen, ['EHLO', 'AUTH', 'MAIL', 'RCPT', 'DATA', 'QUIT']);
   assert.match(data, /Subject: 123456 is your code/);
+});
+
+test('saved data survives a restart (same files or database)', async () => {
+  flush(); await backend?.flush();
+  const again = DB ? await pgBackend(DB, dir, () => {}) : undefined;
+  const second = createApp({ ...makeConfig({ NODE_ENV: 'test' }), dataFile: path.join(dir, 'hub.json'), showDevCodes: true }, { log: () => {}, backend: again });
+  assert.ok(second.store.userCount() >= 5, 'students kept');
+  assert.ok(second.places.get('food', 'darling').count('orders') >= 1, 'canteen orders kept');
+  assert.ok(second.places.get('xerox', 'tt').count('orders') >= 1, 'shop orders kept');
+  again?.close();
+});
+
+test('Brevo email API request', async () => {
+  let seen;
+  await sendBrevo('key-123', { from: 'UniHub <codes@example.com>', to: 'a@vitstudent.ac.in', subject: '123456 is your code', text: 'Code 123456' }, async (url, o) => { seen = { url, o }; return { ok: true }; });
+  assert.equal(seen.url, 'https://api.brevo.com/v3/smtp/email');
+  assert.equal(seen.o.headers['api-key'], 'key-123');
+  assert.deepEqual(JSON.parse(seen.o.body).sender, { name: 'UniHub', email: 'codes@example.com' });
+  await assert.rejects(sendBrevo('k', { from: 'x@y.z', to: 'a@b.c', subject: 's', text: 't' }, async () => ({ ok: false, status: 401, text: async () => 'unauthorized' })), /Brevo 401/);
 });

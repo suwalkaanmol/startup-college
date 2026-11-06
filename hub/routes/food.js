@@ -10,6 +10,7 @@ const TOKEN_VALID_HOURS = 2; // after collection the token stays visible this lo
 const CANCEL_MINUTES = 2; // students can cancel only right after ordering, before the kitchen starts
 const MAX_AHEAD_MIN = 60; // furthest pickup time a student can choose
 const MIN = 60e3;
+const hm = (iso) => new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' });
 
 // Today's date in India for a Date.
 const istDay = (d) => today(d);
@@ -235,6 +236,11 @@ export default function food(r, { store, places, live, cfg }) {
       if ((m = t.match(/^food:menu:(.+)$/))) return Boolean(user || staff);
       return false;
     },
+    // Home page "needs your attention" items.
+    attention: (uid) => mine(uid).filter((o) => ACTIVE.includes(o.status)).map((o) => (o.status === 'READY'
+      ? { source: 'food', tone: 'ok', title: `Token ${o.token} is ready at ${o.canteenName}`, detail: 'Show your token at the counter to collect.', href: 'food/index.html#orders', at: o.readyAt || o.createdAt }
+      : { source: 'food', tone: 'live', title: `${o.canteenName} is preparing token ${o.token}`, detail: `Pick up at ${hm(o.pickupAt)} · ${o.items.map((i) => `${i.qty}× ${i.name}`).join(', ')}`, href: 'food/index.html#orders', at: o.createdAt })),
+    today: () => store.list('canteens').map((c) => { const os = db(c.id).list('orders', (o) => o.day === today() && o.status !== 'CANCELLED'); return { id: c.id, name: c.name, open: c.open, orders: os.length, revenue: os.reduce((n, o) => n + o.total, 0), waiting: os.filter((o) => ACTIVE.includes(o.status)).length }; }),
     // For /verify: finds the order a slip's code belongs to.
     findReceipt: (code) => { for (const c of store.list('canteens')) for (const o of db(c.id).list('orders')) if (receiptCode(cfg.jwtSecret, 'food', c.id, o) === code) return { kind: 'Food', place: c.name, o, lines: o.items.map((i) => `${i.qty}× ${i.name}`) }; return null; },
     studentOrders: (uid) => mine(uid).map((o) => ({ source: 'food', id: o.id, title: o.canteenName, token: o.token, status: o.status, amount: o.total, at: o.createdAt, detail: o.items.map((i) => `${i.qty}× ${i.name}`).join(', ') })),

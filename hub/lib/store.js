@@ -1,20 +1,18 @@
 // A small JSON-file database: students, sign-in codes, and named collections for every section.
-// Good for one server and a campus-sized user base. Writes are batched and atomic (temp file + rename).
-import fs from 'node:fs';
+// Good for one server and a campus-sized user base. Writes are batched; the backend saves them
+// to a file (atomic temp + rename) or to PostgreSQL (see backend.js).
 import path from 'node:path';
+import { fileBackend } from './backend.js';
 import crypto from 'node:crypto';
 
-export function createStore(file) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
+export function createStore(file, backend = fileBackend()) {
   let data = { users: {}, codes: {}, col: {}, seq: {} };
-  try { data = { ...data, ...JSON.parse(fs.readFileSync(file, 'utf8')) }; } catch { /* first run */ }
+  try { const text = backend.read(file); if (text) data = { ...data, ...JSON.parse(text) }; } catch { /* first run */ }
   data.col ||= {}; data.seq ||= {};
   let timer = null;
   const flush = () => {
     timer = null;
-    const tmp = file + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(data));
-    fs.renameSync(tmp, file);
+    backend.write(file, JSON.stringify(data));
   };
   const save = () => { if (!timer) timer = setTimeout(flush, 40); };
   const col = (name) => (data.col[name] ||= {});

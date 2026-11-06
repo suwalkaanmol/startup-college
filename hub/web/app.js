@@ -191,6 +191,8 @@ let orderFilter = 'all';
 const ICONS = {
   food: '<svg viewBox="0 0 24 24"><path d="M3 11h18a9 9 0 0 1-18 0zM8 4c0 1.5 1 1.5 1 3M15 4c0 1.5 1 1.5 1 3"/></svg>',
   xerox: '<svg viewBox="0 0 24 24"><path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M7 14h10v7H7z"/></svg>',
+  travel: '<svg viewBox="0 0 24 24"><path d="M5 16V11l2-5h10l2 5v5M3 16h18v3H3zM7 19v2M17 19v2"/></svg>',
+  pg: '<svg viewBox="0 0 24 24"><path d="M3 21V10l9-6 9 6v11M9 21v-6h6v6"/></svg>',
 };
 function statusPill(s) {
   const label = { READY: 'Ready to collect', QUEUED: 'In queue', COMPLETED: 'Collected' }[s] || cap(s.toLowerCase().replace(/_/g, ' ')) || 'Placed';
@@ -219,13 +221,26 @@ function renderOrders() {
 async function loadOrders() {
   try { ({ orders: allOrders } = await api('/orders')); } catch { allOrders = []; }
   renderOrders();
-  const live = allOrders.find((o) => FOOD_ACTIVE.test(o.status));
-  const box = $('#activity');
-  if (live) {
-    box.hidden = false;
-    box.innerHTML = `${statusPill(live.status)}<span><b>${esc(live.title)}</b> · Token ${esc(live.token)} · ${esc(when(live.at))}</span><a class="link" style="margin-left:auto" href="${live.source}/index.html">Open</a>`;
-  } else box.hidden = true;
 }
+
+// "Needs your attention": ready tokens, prints, ride requests, PG Mate requests, from every section. Updates live.
+async function loadAttention() {
+  let items = [];
+  try { ({ items } = await api('/attention')); } catch { items = []; }
+  const box = $('#attention');
+  box.hidden = !items.length;
+  box.innerHTML = items.length ? `<h2 class="att-h">Needs your attention</h2><ul class="att-list">${items.map((i) => `<li><a class="att ${i.tone}" href="${esc(i.href)}">
+      <span class="o-ico ${esc(i.source)}" aria-hidden="true">${ICONS[i.source] || ''}</span>
+      <span class="att-main"><b>${esc(i.title)}</b><span>${esc(i.detail || '')}</span></span><span class="att-go" aria-hidden="true">→</span></a></li>`).join('')}</ul>` : '';
+}
+let liveSrc = null;
+function watchLive() {
+  if (liveSrc || !me || typeof EventSource === 'undefined') return;
+  liveSrc = new EventSource(`/api/live?t=${encodeURIComponent([`food:u:${me.id}`, `xerox:u:${me.id}`, `travel:u:${me.id}`].join(','))}`);
+  let t; const again = () => { clearTimeout(t); t = setTimeout(() => { loadAttention(); loadOrders(); }, 300); };
+  liveSrc.onmessage = again; liveSrc.addEventListener('update', again);
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden && me?.complete) loadAttention(); });
 $$('.chip').forEach((c) => c.addEventListener('click', () => {
   orderFilter = c.dataset.filter;
   $$('.chip').forEach((x) => x.setAttribute('aria-pressed', String(x === c)));
@@ -317,7 +332,7 @@ function route() {
     fillForm($('#onboard-form'), me); $('#ob-email').value = me.email;
     show('screen-onboard'); $('#ob-name').focus(); return;
   }
-  greet(); show('screen-main'); loadOrders();
+  greet(); show('screen-main'); loadOrders(); loadAttention(); watchLive();
 }
 
 // Installable app: cache the hub so it opens even on a weak connection.

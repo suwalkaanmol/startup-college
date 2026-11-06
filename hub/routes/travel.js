@@ -154,6 +154,17 @@ export default function travel(r, { store, live }) {
   });
 
   return {
+    attention(uid) {
+      const out = [];
+      for (const x of store.list('rides', (y) => upcoming(y))) {
+        const pending = (x.requests || []).filter((q) => q.status === 'PENDING');
+        if (x.createdBy === uid && pending.length) out.push({ source: 'travel', tone: 'live', title: `${pending.length === 1 ? `${pending[0].name} wants` : `${pending.length} people want`} to join your ride`, detail: `${x.from} → ${x.to} · ${x.date === today() ? 'Today' : x.date === today(new Date(Date.now() + 86400e3)) ? 'Tomorrow' : x.date}, ${x.time}`, href: 'travel/index.html', at: pending[pending.length - 1].at });
+        const myReq = (x.requests || []).filter((q) => q.uid === uid).pop();
+        if (isMember(x, uid) && x.date <= today(new Date(Date.now() + 86400e3))) out.push({ source: 'travel', tone: x.members.length >= x.minPeople ? 'ok' : 'warn', title: `Your ride to ${x.to} leaves ${x.date === today() ? 'today' : 'tomorrow'} at ${x.time}`, detail: x.members.length >= x.minPeople ? `${x.members.length} going` : `Needs ${x.minPeople - x.members.length} more to go`, href: 'travel/index.html', at: x.createdAt });
+        else if (myReq?.status === 'PENDING') out.push({ source: 'travel', tone: 'live', title: 'Waiting for your ride request', detail: `${x.from} → ${x.to} · ${x.time}`, href: 'travel/index.html', at: myReq.at });
+      }
+      return out;
+    },
     topics(t, { user }) {
       if (t === 'travel:list') return Boolean(user);
       let m;

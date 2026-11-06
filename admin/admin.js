@@ -13,6 +13,7 @@ async function start(me) {
   app.innerHTML = `
     <section class="hero admin"><h2>UniHub admin</h2><p>Create staff logins, add canteens, manage PG listings and answer enquiries.</p></section>
     <div class="stats" id="counts" style="margin-top:14px"></div>
+    <div id="today" style="margin-top:14px"></div>
     <div class="tabs" role="tablist" style="margin-top:16px">
       <button role="tab" aria-selected="true" data-tab="staff">Staff logins</button><button role="tab" aria-selected="false" data-tab="places">Canteens & shops</button>
       <button role="tab" aria-selected="false" data-tab="pg">PG listings</button><button role="tab" aria-selected="false" data-tab="enq">Enquiries</button>
@@ -25,6 +26,18 @@ async function start(me) {
       .map(([k, v]) => `<div class="stat"><b>${v}</b><span>${k}</span></div>`).join('');
   };
   drawCounts();
+
+  // Today at every canteen and shop: orders, money taken, and how many are still waiting.
+  const drawToday = async () => {
+    let t; try { t = await api('/api/admin/today'); } catch { return; }
+    const table = (title, rows, board) => `<div class="card"><h3 style="margin-bottom:8px">${title}</h3>
+      <table class="today-t"><thead><tr><th scope="col">Place</th><th scope="col">Orders</th><th scope="col">Paid</th><th scope="col">Waiting</th><th scope="col"><span class="sr">Open</span></th></tr></thead>
+      <tbody>${rows.map((r) => `<tr><th scope="row">${esc(r.name)} ${r.open ? '' : '<span class="pill bad">Closed</span>'}</th><td class="num">${r.orders}</td><td class="num">₹${r.revenue.toLocaleString('en-IN')}</td><td class="num">${r.waiting ? `<b style="color:var(--uh-warn)">${r.waiting}</b>` : '0'}</td><td><a class="link small" href="${board(r.id)}">Open</a></td></tr>`).join('')}
+      <tr class="tot"><th scope="row">Total</th><td class="num">${rows.reduce((n, r) => n + r.orders, 0)}</td><td class="num">₹${rows.reduce((n, r) => n + r.revenue, 0).toLocaleString('en-IN')}</td><td class="num">${rows.reduce((n, r) => n + r.waiting, 0)}</td><td></td></tr></tbody></table></div>`;
+    $('#today').innerHTML = `<div class="section-h" style="margin-top:0"><h2>Today</h2><p class="muted small">${t.ridesToday} ride${t.ridesToday === 1 ? '' : 's'} leaving today · ${t.pgProfiles} student${t.pgProfiles === 1 ? '' : 's'} on PG Mate</p></div>
+      <div class="cols2">${table('Canteens', t.canteens, (id) => `../food/staff.html?canteen=${encodeURIComponent(id)}`)}${table('Xerox shops', t.shops, (id) => `../xerox/staff.html?shop=${encodeURIComponent(id)}`)}</div>`;
+  };
+  drawToday(); setInterval(drawToday, 60000);
   const refresh = async () => { ov = await api('/api/admin/overview'); drawCounts(); };
   const placeOptions = (role, sel) => (role === 'canteen' ? ov.places.canteen : ov.places.xerox).map((p) => `<option value="${esc(p.id)}" ${p.id === sel ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
   const showPassword = (title, who, pw) => {

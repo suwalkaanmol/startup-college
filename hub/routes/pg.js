@@ -120,5 +120,11 @@ export default function pg(r, { store }) {
     enquiries: store.list('pgEnquiries', (e) => e.uid === user.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
   }));
 
-  return { topics: () => false };
+  return {
+    topics: () => false,
+    attention(uid) {
+      const mineSent = new Set(store.list('pgConnects', (c) => c.from === uid).map((c) => c.to));
+      return store.list('pgConnects', (c) => c.to === uid && !mineSent.has(c.from)).map((c) => ({ source: 'pg', tone: 'live', title: `${store.get('pgProfiles', c.from)?.name || 'Someone'} wants to connect as PG mates`, detail: 'Connect back to see each other’s number.', href: 'pg/index.html', at: c.createdAt }));
+    },
+  };
 }

@@ -286,3 +286,10 @@ span.label, label.label { display: block; font-size: 13px; font-weight: 600; mar
 /* PG Mate */
 .score { font: 700 15px/1 var(--f-display); color: var(--uh-accent); background: var(--uh-surface-2); border: 1px solid var(--uh-line); padding: 7px 9px; border-radius: 999px; }
 .meet { padding: 8px 10px; border-radius: 10px; background: var(--uh-surface-2); }
+
+/* Admin: today table */
+.today-t { width: 100%; border-collapse: collapse; font-size: 14px; }
+.today-t th, .today-t td { padding: 7px 6px; border-bottom: 1px solid var(--uh-line); text-align: right; }
+.today-t th[scope="row"], .today-t thead th:first-child { text-align: left; font-weight: 600; }
+.today-t thead th { font-size: 12px; color: var(--uh-muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.today-t tr.tot th, .today-t tr.tot td { font-weight: 700; border-bottom: 0; }

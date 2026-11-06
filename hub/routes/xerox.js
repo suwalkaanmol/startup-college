@@ -1,6 +1,5 @@
 // Xerox: each shop has its own database (files, orders, chats). Students upload PDF, Word, PowerPoint or images,
 // choose pages and print options, pay the shop, and collect with a token. Shops work through the queue and chat.
-import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { HttpError, readJson, readBody, need, today } from '../lib/http.js';
@@ -62,10 +61,11 @@ export function priceFile(f, rates) {
   return { selected, sheets, cost: sheets * rates[key] + binding * f.copies };
 }
 
-export default function xerox(r, { store, places, live, cfg }) {
+export default function xerox(r, { store, places, live, cfg, blobs }) {
   const withReceipt = (o) => ({ ...o, receipt: receiptCode(cfg.jwtSecret, 'xerox', o.shopId, o) });
   const db = (sid) => places.get('xerox', sid);
-  const filesDir = (sid) => { const d = places.dir('xerox', sid) + '-uploads'; fs.mkdirSync(d, { recursive: true }); return d; };
+  // Uploaded files live in the storage backend (files on disk, or the database when online).
+  const blobPath = (sid, f) => path.join(places.dir('xerox', sid) + '-uploads', `${f.id}.${f.ext}`);
   const shop = (id) => { const s = store.get('shops', id); if (!s) throw new HttpError(404, 'NOT_FOUND', 'That shop doesn’t exist.'); return s; };
   const shopOut = (s) => ({ id: s.id, name: s.name, grp: s.grp, open: s.open, upi: s.upi || '', rates: s.rates });
   const forStaff = (st, sid) => { if (st.role !== 'admin' && !(st.role === 'xerox' && st.place === sid)) throw new HttpError(403, 'FORBIDDEN', 'This login is for a different shop.'); };
@@ -78,7 +78,7 @@ export default function xerox(r, { store, places, live, cfg }) {
     const cutoff = Date.now() - KEEP_FILES_DAYS * 86400e3;
     for (const s of store.list('shops')) {
       const d = db(s.id);
-      for (const f of d.list('files', (x) => new Date(x.createdAt).getTime() < cutoff)) { fs.rm(path.join(filesDir(s.id), `${f.id}.${f.ext}`), { force: true }, () => {}); d.remove('files', f.id); }
+      for (const f of d.list('files', (x) => new Date(x.createdAt).getTime() < cutoff)) { blobs.del(blobPath(s.id, f)); d.remove('files', f.id); }
     }
   };
   setInterval(sweep, 3600e3).unref();
@@ -101,7 +101,7 @@ export default function xerox(r, { store, places, live, cfg }) {
     try { name = decodeURIComponent(String(req.headers['x-filename'] || name)); } catch { /* keep default */ }
     name = name.replace(/[\\/\r\n"]/g, '_').slice(0, 120) || `document.${type.ext}`;
     const id = crypto.randomUUID();
-    await fs.promises.writeFile(path.join(filesDir(s.id), `${id}.${type.ext}`), buf);
+    await blobs.put(blobPath(s.id, { id, ext: type.ext }), buf);
     const f = d.put('files', { id, shopId: s.id, studentId: user.id, name, kind: type.kind, ext: type.ext, mime: Object.keys(TYPES).find((k) => TYPES[k] === type), size: buf.length, pages, pagesKnown: pages > 0 });
     return { file: fileOut(f) };
   });
@@ -110,7 +110,7 @@ export default function xerox(r, { store, places, live, cfg }) {
     const d = db(shop(params.sid).id); const f = d.get('files', params.id);
     if (!f || f.studentId !== user.id) throw new HttpError(404, 'NOT_FOUND', 'File not found.');
     if (d.list('orders', (o) => o.files.some((x) => x.fileId === f.id) && ACTIVE.includes(o.status)).length) return { ok: true }; // still needed by an order
-    fs.rm(path.join(filesDir(params.sid), `${f.id}.${f.ext}`), { force: true }, () => {}); d.remove('files', f.id);
+    blobs.del(blobPath(params.sid, f)); d.remove('files', f.id);
     return { ok: true };
   });
 
@@ -253,17 +253,17 @@ export default function xerox(r, { store, places, live, cfg }) {
   });
 
   // Files: the student who uploaded it, or the owner of that shop (only once it is part of an order).
-  r.get('/api/xerox/shops/:sid/files/:id', 'any', ({ params, user, staff, res, url }) => {
+  r.get('/api/xerox/shops/:sid/files/:id', 'any', async ({ params, user, staff, res, url }) => {
     const s = shop(params.sid); const d = db(s.id); const f = d.get('files', params.id);
     if (!f) throw new HttpError(404, 'NOT_FOUND', `This file has been deleted (files are kept for ${KEEP_FILES_DAYS} days).`);
     let ok = user && f.studentId === user.id;
     if (!ok && staff) ok = (staff.role === 'admin' || (staff.role === 'xerox' && staff.place === s.id)) && d.list('orders', (o) => o.files.some((x) => x.fileId === f.id)).length > 0;
     if (!ok) throw new HttpError(403, 'FORBIDDEN', 'You can’t open this file.');
-    const p = path.join(filesDir(s.id), `${f.id}.${f.ext}`);
-    if (!fs.existsSync(p)) throw new HttpError(404, 'NOT_FOUND', 'This file has been deleted.');
+    const data = await blobs.get(blobPath(s.id, f));
+    if (!data) throw new HttpError(404, 'NOT_FOUND', 'This file has been deleted.');
     const dl = url.searchParams.get('download') === '1';
     res.writeHead(200, { 'Content-Type': f.mime, 'Content-Disposition': `${dl ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(f.name)}`, 'Cache-Control': 'private, no-store' });
-    fs.createReadStream(p).pipe(res);
+    res.end(data);
     return r.HANDLED;
   });
 
@@ -275,12 +275,18 @@ export default function xerox(r, { store, places, live, cfg }) {
       if ((m = t.match(/^xerox:s:(.+)$/))) return staff && (staff.role === 'admin' || (staff.role === 'xerox' && staff.place === m[1]));
       return false;
     },
+    attention(uid) {
+      const out = mine(uid).filter((o) => ACTIVE.includes(o.status)).map((o) => ({ source: 'xerox', tone: o.status === 'READY' ? 'ok' : 'live', title: o.status === 'READY' ? `Prints ready at ${o.shopName} · token ${o.token}` : `${o.shopName}: token ${o.token} ${o.status === 'PRINTING' ? 'is printing' : 'is in the queue'}`, detail: o.files.map((f) => f.name).join(', '), href: 'xerox/index.html', at: o.createdAt }));
+      for (const s of store.list('shops')) { const n = db(s.id).list('messages', (m) => m.studentId === uid && m.from === 'shop' && !m.seen).length; if (n) out.push({ source: 'xerox', tone: 'live', title: `${s.name} replied in chat`, detail: `${n} new message${n === 1 ? '' : 's'}`, href: 'xerox/index.html', at: new Date().toISOString() }); }
+      return out;
+    },
+    today: () => store.list('shops').map((s) => { const os = db(s.id).list('orders', (o) => o.day === today() && o.status !== 'CANCELLED'); return { id: s.id, name: s.name, open: s.open, orders: os.length, revenue: os.reduce((n, o) => n + o.total, 0), waiting: os.filter((o) => ['QUEUED', 'PRINTING'].includes(o.status)).length }; }),
     findReceipt: (code) => { for (const s of store.list('shops')) for (const o of db(s.id).list('orders')) if (receiptCode(cfg.jwtSecret, 'xerox', s.id, o) === code) return { kind: 'Xerox', place: s.name, o, lines: o.files.map((f) => `${f.name} (${f.sheets} sheets)`) }; return null; },
     studentOrders: (uid) => mine(uid).map((o) => ({ source: 'xerox', id: o.id, title: o.shopName, token: o.token, status: o.status, amount: o.total, at: o.createdAt, detail: o.files.map((i) => i.name).join(', ') })),
     forgetStudent(uid) {
       for (const s of store.list('shops')) {
         const d = db(s.id);
-        for (const f of d.list('files', (x) => x.studentId === uid)) { fs.rm(path.join(filesDir(s.id), `${f.id}.${f.ext}`), { force: true }, () => {}); d.remove('files', f.id); }
+        for (const f of d.list('files', (x) => x.studentId === uid)) { blobs.del(blobPath(s.id, f)); d.remove('files', f.id); }
         for (const m of d.list('messages', (x) => x.studentId === uid)) d.remove('messages', m.id);
       }
     },

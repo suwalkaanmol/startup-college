@@ -192,6 +192,7 @@ const PG_SAMPLES = [
 const SEED_VERSION = 3;
 
 export function seed(store, places, cfg, log = console.log) {
+  if (cfg.production && !cfg.adminPassword && !store.list('staff', (x) => x.role === 'admin').length) throw new Error('Set ADMIN_PASSWORD (8+ characters, letters and numbers) before the first start in production.');
   const meta = store.get('meta', 'seed');
   if ((meta?.v || 1) < 2 && store.count('canteens')) upgradeFromV1(store);
   // Version 3: PG Mate is about office cities, so the old near-campus sample PGs are replaced.
@@ -222,9 +223,9 @@ export function seed(store, places, cfg, log = console.log) {
   }
   if (lines.length) {
     if (cfg.production) {
-      const out = path.join(store.dir, 'first-run-logins.txt');
-      fs.appendFileSync(out, 'UniHub owner logins created on first run. Change them in the admin page, then delete this file.\n\n' + lines.join('\n') + '\n', { mode: 0o600 });
-      log(`Owner logins created. They are in ${out}`);
+      // On a server with a disk, also keep them in a private file (not possible on hosts without one; the admin can reset them).
+      try { fs.mkdirSync(store.dir, { recursive: true }); fs.appendFileSync(path.join(store.dir, 'first-run-logins.txt'), 'UniHub owner logins created on first run. Change them in the admin page, then delete this file.\n\n' + lines.join('\n') + '\n', { mode: 0o600 }); } catch { /* no writable disk */ }
+      log('Owner logins created with random passwords. Sign in at /admin/ (staff ID admin, your ADMIN_PASSWORD) and use “Reset password” on each canteen and shop login to get its password.');
     } else {
       log('Owner logins for local testing (see SETUP.md):\n  ' + lines.join('\n  '));
     }

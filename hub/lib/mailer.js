@@ -117,3 +117,16 @@ export async function sendMail(smtpUrl, { from, to, subject, text, html }) {
     sock.end();
   }
 }
+
+// Brevo's email API over HTTPS (port 443), for hosts that block SMTP ports (e.g. Render's free plan).
+// from: "UniHub <you@example.com>" — the address must be a verified sender in Brevo.
+export async function sendBrevo(apiKey, { from, to, subject, text, html }, fetchImpl = fetch) {
+  const m = String(from).match(/^\s*(.*?)\s*<([^>]+)>\s*$/);
+  const sender = m ? { name: m[1] || 'UniHub', email: m[2] } : { email: String(from).trim() };
+  const res = await fetchImpl('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: { 'api-key': apiKey, 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({ sender, to: [{ email: to }], subject, textContent: text, htmlContent: html || undefined }),
+  });
+  if (!res.ok) throw new Error(`Brevo ${res.status}: ${(await res.text()).slice(0, 200)}`);
+}

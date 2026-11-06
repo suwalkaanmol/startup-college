@@ -9,12 +9,13 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { sign, verify } from './lib/jwt.js';
-import { sendMail } from './lib/mailer.js';
+import { sendMail, sendBrevo } from './lib/mailer.js';
 import { createStore } from './lib/store.js';
 import { createPlaces } from './lib/places.js';
+import { fileBackend, pgBackend } from './lib/backend.js';
 import { normalizeCode } from './lib/receipt.js';
 import { createLive } from './lib/live.js';
-import { HttpError, send, fail, readJson, cookies, clientIp, limiter } from './lib/http.js';
+import { HttpError, send, fail, readJson, cookies, clientIp, limiter, today } from './lib/http.js';
 import { seed } from './seed.js';
 import food from './routes/food.js';
 import xerox from './routes/xerox.js';
@@ -47,6 +48,8 @@ export function makeConfig(env = process.env) {
     domain: (env.ALLOWED_DOMAIN || 'vitstudent.ac.in').toLowerCase(),
     jwtSecret,
     smtpUrl: env.SMTP_URL || '',
+    brevoKey: env.BREVO_API_KEY || '',
+    databaseUrl: env.DATABASE_URL || '',
     mailFrom: env.MAIL_FROM || 'UniHub <no-reply@unihub.local>',
     showDevCodes: env.DEV_SHOW_CODES ? env.DEV_SHOW_CODES === 'true' : !production,
     adminPassword: env.ADMIN_PASSWORD || '',
@@ -127,10 +130,13 @@ function createRouter() {
 
 // ---------- app ----------
 export function createApp(cfg = makeConfig(), deps = {}) {
-  const store = deps.store || createStore(cfg.dataFile);
+  const backend = deps.backend || fileBackend();
+  const store = deps.store || createStore(cfg.dataFile, backend);
   // Each canteen and Xerox shop keeps its own database next to the main one.
-  const places = deps.places || createPlaces(path.dirname(cfg.dataFile));
+  const places = deps.places || createPlaces(path.dirname(cfg.dataFile), (f) => createStore(f, backend));
   const mail = deps.sendMail || sendMail;
+  const mailOn = Boolean(cfg.brevoKey || cfg.smtpUrl);
+  const deliver = (m) => (cfg.brevoKey ? (deps.sendBrevo || sendBrevo)(cfg.brevoKey, m) : mail(cfg.smtpUrl, m));
   const live = createLive();
   const log = deps.log || console.log;
   seed(store, places, cfg, log);
@@ -147,17 +153,18 @@ export function createApp(cfg = makeConfig(), deps = {}) {
     staff(req) { const c = verify(cookies(req).hub_staff, cfg.jwtSecret); return c && c.typ === 'staff' ? store.get('staff', c.sub) : null; },
   };
   const ctx = {
-    store, places, live, cfg,
+    store, places, live, cfg, blobs: backend.blobs,
     setStaffSession(req, res, s) { addCookie(res, cookie(req, 'hub_staff', sign({ sub: s.id, typ: 'staff' }, cfg.jwtSecret, { expiresInSec: 12 * 3600 }), 12 * 3600)); },
     clearStaffSession(req, res) { addCookie(res, cookie(req, 'hub_staff', '', 0)); },
   };
 
   const r = createRouter();
-  const modules = [food(r, ctx), xerox(r, ctx), travel(r, ctx), pg(r, ctx), staffRoutes(r, ctx)];
+  const mods = { food: food(r, ctx), xerox: xerox(r, ctx), travel: travel(r, ctx), pg: pg(r, ctx), staff: staffRoutes(r, ctx) };
+  const modules = Object.values(mods);
 
   // ---------- student sign-in ----------
   r.get('/api/health', null, () => ({ ok: true }));
-  r.get('/api/hub/config', null, () => ({ appName: cfg.appName, domain: cfg.domain, devCodes: cfg.showDevCodes && !cfg.smtpUrl, mail: Boolean(cfg.smtpUrl) }));
+  r.get('/api/hub/config', null, () => ({ appName: cfg.appName, domain: cfg.domain, devCodes: cfg.showDevCodes && !mailOn, mail: mailOn }));
 
   r.post('/api/hub/auth/request-code', null, async ({ req }) => {
     if (!ipCodeLimit(clientIp(req))) throw new HttpError(429, 'RATE_LIMIT', 'Too many code requests from this network. Try again in 15 minutes.');
@@ -171,9 +178,9 @@ export function createApp(cfg = makeConfig(), deps = {}) {
     if (hourCount > 6) throw new HttpError(429, 'RATE_LIMIT', 'Too many codes for this email. Try again in an hour.');
     const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
     store.setCode(e.value, { hash: hashCode(e.value, code), exp: t + 10 * 60e3, tries: 0, sentAt: t, hourStart, hourCount });
-    if (cfg.smtpUrl) {
+    if (mailOn) {
       try {
-        await mail(cfg.smtpUrl, {
+        await deliver({
           from: cfg.mailFrom, to: e.value, subject: `${code} is your ${cfg.appName} code`,
           text: `Your ${cfg.appName} sign-in code is ${code}.\n\nIt expires in 10 minutes. If you didn't ask for it, ignore this email.`,
           html: `<div style="font-family:Arial,sans-serif;font-size:15px;color:#14204a"><p>Your ${cfg.appName} sign-in code is</p><p style="font-size:30px;letter-spacing:6px;font-weight:bold;color:#1f3fae">${code}</p><p>It expires in 10 minutes. If you didn't ask for it, you can ignore this email.</p></div>`,
@@ -231,6 +238,16 @@ export function createApp(cfg = makeConfig(), deps = {}) {
     return { ok: true };
   });
   // Everything the student ordered, newest first, for the profile drawer.
+  // Home page: what needs the student's attention across every section, newest first.
+  r.get('/api/hub/attention', 'student', ({ user }) => ({ items: modules.flatMap((m) => m.attention?.(user.id) || []).sort((a, b) => (b.tone === 'ok') - (a.tone === 'ok') || String(b.at).localeCompare(String(a.at))).slice(0, 8) }));
+
+  // Admin: today's orders and takings for each canteen and shop.
+  r.get('/api/admin/today', 'admin', () => {
+    const [canteens, shops] = [mods.food.today(), mods.xerox.today()];
+    const day = today();
+    return { canteens, shops, ridesToday: store.list('rides', (x) => x.date === day).length, pgProfiles: store.count('pgProfiles') };
+  });
+
   r.get('/api/hub/orders', 'student', ({ user }) => {
     const all = modules.flatMap((m) => m.studentOrders?.(user.id) || []);
     return { orders: all.sort((a, b) => b.at.localeCompare(a.at)).slice(0, 60) };
@@ -321,15 +338,19 @@ export function createApp(cfg = makeConfig(), deps = {}) {
   });
   setInterval(() => store.pruneCodes(), 10 * 60e3).unref();
   const flush = () => { store.flushNow(); places.flushAll(); };
-  return { server, store, places, cfg, live, flush };
+  return { server, store, places, cfg, live, flush, backend };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const { server, cfg, flush } = createApp();
+  const cfg0 = makeConfig();
+  // With DATABASE_URL, everything is stored in PostgreSQL (shared, survives restarts); otherwise in files.
+  const backend = cfg0.databaseUrl ? await pgBackend(cfg0.databaseUrl, path.dirname(cfg0.dataFile)) : undefined;
+  if (!backend && cfg0.production) console.log('Warning: no DATABASE_URL, so data is kept in files on this server only.');
+  const { server, cfg, flush, backend: be } = createApp(cfg0, { backend });
   server.listen(cfg.port, () => {
-    console.log(`${cfg.appName} running at http://localhost:${cfg.port}`);
-    if (!cfg.smtpUrl) console.log(cfg.showDevCodes ? 'No SMTP_URL set: sign-in codes are printed here and shown on screen (test mode).' : 'No SMTP_URL set: email sign-in is off.');
+    console.log(`${cfg.appName} running at http://localhost:${cfg.port} (storage: ${be.kind})`);
+    if (!cfg.smtpUrl && !cfg.brevoKey) console.log(cfg.showDevCodes ? 'No email set up: sign-in codes are printed here and shown on screen (test mode).' : 'No email set up (BREVO_API_KEY or SMTP_URL): email sign-in is off.');
   });
-  const stop = () => { flush(); process.exit(0); };
+  const stop = async () => { flush(); await be.flush().catch(() => {}); process.exit(0); };
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
 }
